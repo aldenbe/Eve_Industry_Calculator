@@ -1,0 +1,95 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  animation: App-logo-spin infinite 20s linear;
+  height: 80px;
+}
+
+.App-header {
+  background-color: #222;
+  height: 150px;
+  padding: 20px;
+  color: white;
+}
+
+.App-title {
+  font-size: 1.5em;
+}
+
+.App-intro {
+  font-size: large;
+}
+
+@keyframes App-logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@font-face {
+  font-family: 'eve';
+  src: local('eve'), url(./fonts/eve.ttf) format('truetype');
+}
+
+.eic {
+  font-family: 'eve' !important;
+  font-size: 5em;
+  width: 100%;
+}
+body {
+    font-size: 12px;
+    color: #d3d3d3;
+    font-family: Verdana, Geneva, sans-serif;
+    background-color: black;
+    background-image: url('./images/eve-background.png');
+    background-repeat: no-repeat;
+    background-position: center top;
+}
+
+div.ui.container.eic-container {
+  background: rgba(60,60,60,.85) !important;
+  color: #d3d3d3 !important;
+  padding: 25px 25px 25px 25px;
+  margin-left: 5% !important;
+  margin-right: 5% !important;
+  width: 90%;
+}
+.top-menu {
+  background: transparent;
+  margin-left: 5%;
+  margin-right: 5%;
+  height: 100px;
+  padding: 0;
+  margin-bottom: 0;
+}
+.menu-li {
+  display: inline-block;
+  background: rgba(60,60,60,.85);
+
+
+  height: 100px;
+  width: 100px;
+  margin-right: 1%;
+}
+.menu-link {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 92px 92px;
+  display: block;
+  height: 100%;
+  width: 100%;
+  top: 0; left: 0; bottom: 0; right: 0;
+  box-shadow: inset 2px 2px 4px 5px rgba(0,0,0,0.3);
+}
+.menu-link.active {
+  box-shadow: none;
+}
+.menu-manufacturing {
+  background-image: url('./images/manufacturing.png');
+}
+.menu-about {
+  background-image: url('./images/about.png');
+}
+.menu-reactions {
+  background-image: url('./images/reactions.png');
+}

@@ -57,3 +57,12 @@ typings/
 # dotenv environment variables file
 .env
 
+# contains sensitive passwords
+connect.php
+
+# FIXME: Just some local stuff that i'm not sure about yet, clean this up later
+Types/
+6_64_2.png
+7_64_12.png
+9_64_4.png
+eve-background-hi-res.png

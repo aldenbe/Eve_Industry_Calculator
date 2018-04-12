@@ -1,0 +1,12 @@
+{
+  "blueprintTypes": [
+    {
+      "type": "all",
+      "label": "All"
+    },
+    {
+      "type": "ships",
+      "label": "Ships"
+    }
+  ]
+}
