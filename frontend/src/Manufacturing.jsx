@@ -5,13 +5,14 @@ import manufacturingConstants from './constants/ManufacturingConstants.json';
 import { API_ROOT, ICON_ROOT } from './api-config';
 var fetch = require('fetch-retry');
 
+var getMinSellValue = require('./utils.js').getMinSellValue;
+var formatNumbersWithCommas = require('./utils.js').formatNumbersWithCommas;
+var formatTime = require('./utils.js').formatTime;
 class Manufacturing extends React.Component {
   constructor(props){
     super(props);
     this.state = {
       productSellPrice: 0,
-      formattedRawBuildTime: '0:00:00:00',
-      formattedCalculatedBuildTime: '0:00:00:00',
       blueprintTypes: manufacturingConstants.blueprintTypes,
       blueprints: [],
       selectedBlueprint: {
@@ -82,12 +83,9 @@ class Manufacturing extends React.Component {
           response.json().then(blueprintResponse => {
             this.setState({
               selectedBlueprint: blueprintResponse,
-              formattedRawBuildTime: this.formatTime(blueprintResponse.rawBuildTime),
-              formattedCalculatedBuildTime: this.formatTime(blueprintResponse.rawBuildTime * blueprintResponse.maxProductionLimit),
-              runs: blueprintResponse.maxProductionLimit
+              runs: blueprintResponse.maxProductionLimit,
             })
-            this.getMinSellValue(blueprintResponse.productTypeID).then(minSellPrice => {
-              console.log(minSellPrice);
+            getMinSellValue(this.state.regionID, blueprintResponse.productTypeID).then(minSellPrice => {
               this.setState({
                 productSellPrice: minSellPrice
               })
@@ -122,39 +120,13 @@ class Manufacturing extends React.Component {
     }
   }
 
-  getMinSellValue = (typeID) => {
-    return fetch('https://esi.tech.ccp.is/latest/markets/' + this.state.regionID + '/orders/?order_type=sell&type_id=' + typeID, {
-      retryOn: [500, 502],
-      retryDelay: 250,
-      method: 'GET',
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }).then(response => {
-      if (response.ok){
-        return response.json()
-      }
-    }).then(json => {
 
-      //get minimum price or set 0 if no price available
-      let minPrice = 0;
-      if (json.length > 0){
-        minPrice = json[0].price;
-        for (let j = 1, len=json.length; j < len; j++){
-          let curPrice = json[j].price;
-          minPrice = (curPrice < minPrice) ? curPrice : minPrice;
-        }
-      }
-
-      return minPrice;
-    });
-  }
 
   getMaterialSellValues = (blueprintBuildMaterials) => {
     var promises = [];
     for (let i = 0; i < blueprintBuildMaterials.length; i++) {
 
-      var promise = this.getMinSellValue(blueprintBuildMaterials[i].materialTypeID).then((minPrice) => {
+      var promise = getMinSellValue(this.state.regionID, blueprintBuildMaterials[i].materialTypeID).then((minPrice) => {
         blueprintBuildMaterials[i].costPerItem = minPrice;
       });
 
@@ -189,22 +161,7 @@ class Manufacturing extends React.Component {
     }
     this.setState({
       runs: e.target.value,
-      formattedCalculatedBuildTime: this.formatTime(this.state.selectedBlueprint.rawBuildTime * e.target.value)
     });
-  }
-  formatTime = (seconds) => {
-    let days = Math.floor(seconds / (3600*24));
-    seconds  -= days*3600*24;
-    let hours   = Math.floor(seconds / 3600);
-    seconds  -= hours*3600;
-    let minutes = Math.floor(seconds / 60);
-    seconds  -= minutes*60;
-    return (days + ":" + this.pad(hours, 2) + ":" + this.pad(minutes, 2) + ":" + this.pad(seconds, 2));
-  }
-  pad = (num, size) => {
-    var s = num+"";
-    while (s.length < size) s = "0" + s;
-    return s;
   }
 
   render() {
@@ -219,46 +176,47 @@ class Manufacturing extends React.Component {
               selectedBlueprintTypeIndex={this.state.selectedBlueprintTypeIndex}
               handleBlueprintTypeSelectionChange={this.handleBlueprintTypeSelectionChange}
             />
-          <Grid.Column width={6}>
-            <Grid>
-              <Grid.Row>
-                <Grid.Column width={6}>
-                  <img className="bordered-icon" src={ICON_ROOT + this.state.selectedBlueprint.typeID + '_64.png'} alt=""></img>
-                </Grid.Column>
-                <Grid.Column width={10}>
-                  <Grid>
-                    <Grid.Row>
-                      <Grid.Column width={6}>
-                        <p>Runs: </p>
-                      </Grid.Column>
-                      <Grid.Column width={10}>
-                        <Input
-                        style={{width:'100%'}}
-                        min="0"
-                        name="runs"
-                        max={this.state.selectedBlueprint.maxProductionLimit}
-                        value={this.state.runs}
-                        onChange={this.onRunsInputChange}
-                        />
-                      </Grid.Column>
-                    </Grid.Row>
-                  </Grid>
+            <Grid.Column width={6}>
+              <Grid>
+                <Grid.Row>
+                  <Grid.Column width={6}>
+                    <img className="bordered-icon" src={ICON_ROOT + this.state.selectedBlueprint.typeID + '_64.png'} alt=""></img>
+                  </Grid.Column>
+                  <Grid.Column width={10}>
+                    <Grid>
+                      <Grid.Row>
+                        <Grid.Column width={6}>
+                          <p>Runs: </p>
+                        </Grid.Column>
+                        <Grid.Column width={10}>
+                          <Input
+                          style={{width:'100%'}}
+                          min="1"
+                          name="runs"
+                          max={this.state.selectedBlueprint.maxProductionLimit}
+                          value={this.state.runs}
+                          onChange={this.onRunsInputChange}
+                          />
+                        </Grid.Column>
+                      </Grid.Row>
+                    </Grid>
 
 
-                </Grid.Column>
-              </Grid.Row>
-            </Grid>
+                  </Grid.Column>
+                </Grid.Row>
+              </Grid>
 
-          </Grid.Column>
-            <OutputInformation
-              formattedRawBuildTime={this.state.formattedRawBuildTime}
-              calculatedBuildTime={this.state.formattedCalculatedBuildTime}
-              productSellPrice={this.state.productSellPrice}
-              runs={this.state.runs}
-              quantityProduced={this.state.selectedBlueprint.quantity}
-              totalMaterialCost={this.state.totalMaterialCost}
-              rawBuildTime={this.state.selectedBlueprint.rawBuildTime}
-            />
+            </Grid.Column>
+            <Grid.Column width={4}>
+              <OutputInformation
+                productSellPrice={this.state.productSellPrice}
+                runs={this.state.runs}
+                quantityProduced={this.state.selectedBlueprint.quantity}
+                totalMaterialCost={this.state.totalMaterialCost}
+                rawBuildTime={this.state.selectedBlueprint.rawBuildTime}
+              />
+            </Grid.Column>
+
           </Grid.Row>
           <Grid.Row>
             <Grid.Column>
@@ -349,7 +307,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={this.props.formattedRawBuildTime}
+                value={formatTime(this.props.rawBuildTime)}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -361,7 +319,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={this.props.calculatedBuildTime}
+                value={formatTime(this.props.rawBuildTime * this.props.runs)}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -399,7 +357,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas((this.props.quantityProduced * this.props.runs * this.props.productSellPrice - this.props.totalMaterialCost * this.props.runs).toFixed(2))}
+                value={formatNumbersWithCommas((this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.totalMaterialCost)).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -411,7 +369,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas(((this.props.quantityProduced * this.props.runs * this.props.productSellPrice - this.props.totalMaterialCost * this.props.runs) / (this.props.rawBuildTime / 3600)).toFixed(2))}
+                value={formatNumbersWithCommas((((this.props.quantityProduced * this.props.productSellPrice) - this.props.totalMaterialCost) / (this.props.rawBuildTime / 3600)).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -453,8 +411,4 @@ class MaterialsTable extends React.Component {
       </Table>
     )
   }
-}
-
-const formatNumbersWithCommas = (number) => {
-  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }

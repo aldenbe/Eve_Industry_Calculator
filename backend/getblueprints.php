@@ -1,5 +1,6 @@
 <?php
 include "./connect.php";
+include "./utils.php";
 $request = json_decode(file_get_contents('php://input'), TRUE);
 $result;
 $blueprintGroups = array();
@@ -11,16 +12,7 @@ switch ($request["selectedBlueprintType"]){
     $blueprintGroups = [105, 106, 107, 108, 110, 111, 487, 489, 490, 503, 525, 537, 643, 944, 996, 1013, 1542];
     break;
 }
-function utf8ize($d) {
-    if (is_array($d)) {
-        foreach ($d as $k => $v) {
-            $d[$k] = utf8ize($v);
-        }
-    } else if (is_string ($d)) {
-        return utf8_encode($d);
-    }
-    return $d;
-}
+
 $blueprintSelect =
 "SELECT industryBlueprints.typeID as 'value', typeName as 'text'
   FROM industryBlueprints

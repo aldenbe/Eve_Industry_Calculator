@@ -1,21 +1,11 @@
 <?php
 include "./connect.php";
-include "./fetch.php";
+include "./utils.php";
 $request = json_decode(file_get_contents('php://input'), TRUE);
 $result;
 $selectedBlueprint = $request["selectedBlueprint"];
 $blueprint = array();
 
-function utf8ize($d) {
-    if (is_array($d)) {
-        foreach ($d as $k => $v) {
-            $d[$k] = utf8ize($v);
-        }
-    } else if (is_string ($d)) {
-        return utf8_encode($d);
-    }
-    return $d;
-}
 $blueprintDetailsSelect =
 "SELECT time as rawBuildTime, productTypeID, quantity, maxProductionLimit
 FROM industryActivity
