@@ -3,10 +3,11 @@ import { Redirect, BrowserRouter, NavLink, Route, Switch } from 'react-router-do
 import { Container } from 'semantic-ui-react';
 import 'semantic-ui-css/semantic.min.css';
 import Manufacturing from './Manufacturing';
-//import About from './About';
-//import Reactions from './Reactions';
+import About from './About';
+import Reactions from './Reactions';
 
 import './App.css';
+
 
 class App extends Component {
 
@@ -41,10 +42,9 @@ class App extends Component {
             <Switch>
               <Redirect exact from="/" to="/Manufacturing" />
               <Route path="/Manufacturing" component={Manufacturing} />
-              {/*
               <Route path="/Reactions" component={Reactions} />
               <Route path="/About" component={About} />
-              */}
+
             </Switch>
           </Container>
         </div>

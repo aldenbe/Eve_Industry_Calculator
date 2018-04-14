@@ -3,15 +3,15 @@ include "./connect.php";
 include "./utils.php";
 $request = json_decode(file_get_contents('php://input'), TRUE);
 $result;
-$selectedBlueprint = $request["selectedBlueprint"];
+$selectedReaction = $request["selectedReaction"];
 $materials = array();
 
-$blueprintMaterialSelect = "SELECT materialTypeID, quantity, typeName, volume From industryActivityMaterials
+$reactionMaterialSelect = "SELECT materialTypeID, quantity, typeName, volume From industryActivityMaterials
 JOIN invTypes ON materialTypeID = invTypes.typeID
 WHERE industryActivityMaterials.typeID = ?
-AND activityID = 1";
-if($stmt = $conn->prepare($blueprintMaterialSelect)){
-  $stmt->bind_param("s", $selectedBlueprint);
+AND activityID = 11";
+if($stmt = $conn->prepare($reactionMaterialSelect)){
+  $stmt->bind_param("s", $selectedReaction);
   $stmt->execute();
 
 
