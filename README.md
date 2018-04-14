@@ -12,3 +12,5 @@ In order to set up a developer environment to work on this project, please first
 5. Modify frontend/src/api-config.js to reflect your backend hosting location
 6. Navigate to the frontend directory and run npm install to install all directories
 7. You can now run npm start in the frontend directory to run your own local version of Eve Industry Calculator
+
+There is a discord server for this project, feel free to join and propose features or request the developer role if you would like to contribute. https://discord.gg/SjfVrfz
