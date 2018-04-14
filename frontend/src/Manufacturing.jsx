@@ -125,7 +125,6 @@ class Manufacturing extends React.Component {
     if(quantity === 1){
       return quantity * this.state.runs
     } else {
-      quantity *= this.state.runs;
       quantity = Math.ceil((quantity * this.state.runs) * (1 - this.state.materialEfficiency / 100));
     }
     return quantity
