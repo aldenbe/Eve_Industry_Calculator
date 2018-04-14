@@ -26,8 +26,8 @@ class Manufacturing extends React.Component {
       blueprintBuildMaterials: [],
       regionID: '10000002',
       runs: 0,
-      totalMaterialCost: 0,
-      totalMaterialVolume: 0,
+      materialEfficiency: 0,
+      timeEfficiency: 0,
     }
     this.getBlueprints();
   }
@@ -120,7 +120,30 @@ class Manufacturing extends React.Component {
     }
   }
 
-
+  getMaterialQuantityAfterME = (materialIndex) => {
+    let quantity = this.state.blueprintBuildMaterials[materialIndex].quantity;
+    if(quantity === 1){
+      return quantity * this.state.runs
+    } else {
+      quantity *= this.state.runs;
+      quantity = Math.ceil((quantity * this.state.runs) * (1 - this.state.materialEfficiency / 100));
+    }
+    return quantity
+  }
+  getTotalMaterialVolume = () => {
+    let totalVolume = 0;
+    for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
+      totalVolume += (this.getMaterialQuantityAfterME(i) * this.state.blueprintBuildMaterials[i].volume);
+    }
+    return totalVolume
+  }
+  getTotalMaterialCost = () => {
+    let totalCost = 0;
+    for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
+      totalCost += (this.getMaterialQuantityAfterME(i) * this.state.blueprintBuildMaterials[i].costPerItem);
+    }
+    return totalCost
+  }
 
   getMaterialSellValues = (blueprintBuildMaterials) => {
     var promises = [];
@@ -136,23 +159,13 @@ class Manufacturing extends React.Component {
     //after all prices are fetched update state
     Promise.all(promises).then((values) => {
 
-      let totalCost = 0.00;
-      let totalVolume = 0.00;
-      for (let i = 0; i < blueprintBuildMaterials.length; i++){
-        totalVolume += (blueprintBuildMaterials[i].volume * blueprintBuildMaterials[i].quantity);
-        totalCost += (blueprintBuildMaterials[i].costPerItem * blueprintBuildMaterials[i].quantity);
-      }
-      totalCost = totalCost.toFixed(2);
-      totalVolume = totalVolume.toFixed(2);
       this.setState({
         blueprintBuildMaterials: blueprintBuildMaterials,
-        totalMaterialVolume: totalVolume,
-        totalMaterialCost: totalCost
       })
     });
 
   }
-  onRunsInputChange = (e) => {
+  onInputChange = (e) => {
     let radix = 10;
     if (parseInt(e.target.value, radix) > parseInt(e.target.max, radix)) {
       e.target.value = e.target.max;
@@ -160,7 +173,7 @@ class Manufacturing extends React.Component {
       e.target.value = e.target.min;
     }
     this.setState({
-      runs: e.target.value,
+      [e.target.name]: e.target.value,
     });
   }
 
@@ -185,18 +198,45 @@ class Manufacturing extends React.Component {
                   <Grid.Column width={10}>
                     <Grid>
                       <Grid.Row>
-                        <Grid.Column width={6}>
-                          <p>Runs: </p>
-                        </Grid.Column>
-                        <Grid.Column width={10}>
+                        <Grid.Column>
+                          <label for='runsInput'>Runs: </label>
                           <Input
-                          style={{width:'100%'}}
+                          style={{width:'70%'}}
+                          id="runsInput"
                           min="1"
                           name="runs"
                           max={this.state.selectedBlueprint.maxProductionLimit}
                           value={this.state.runs}
-                          onChange={this.onRunsInputChange}
+                          onChange={this.onInputChange}
                           />
+
+                        </Grid.Column>
+
+                      </Grid.Row>
+                      <Grid.Row columns='equal'>
+                        <Grid.Column>
+                          <label for="meInput">ME: </label>
+                            <Input
+                            style={{width:'40px'}}
+                            id="meInput"
+                            min="0"
+                            name="materialEfficiency"
+                            max="10"
+                            value={this.state.materialEfficiency}
+                            onChange={this.onInputChange}
+                            />
+                        </Grid.Column>
+                        <Grid.Column>
+                          <label for="teInput">TE: </label>
+                            <Input
+                              style={{width:'40px'}}
+                            id="teInput"
+                            min="0"
+                            name="timeEfficiency"
+                            max="10"
+                            value={this.state.timeEfficiency}
+                            onChange={this.onInputChange}
+                            />
                         </Grid.Column>
                       </Grid.Row>
                     </Grid>
@@ -204,6 +244,7 @@ class Manufacturing extends React.Component {
 
                   </Grid.Column>
                 </Grid.Row>
+
               </Grid>
 
             </Grid.Column>
@@ -212,8 +253,10 @@ class Manufacturing extends React.Component {
                 productSellPrice={this.state.productSellPrice}
                 runs={this.state.runs}
                 quantityProduced={this.state.selectedBlueprint.quantity}
-                totalMaterialCost={this.state.totalMaterialCost}
+                getTotalMaterialCost={this.getTotalMaterialCost}
                 rawBuildTime={this.state.selectedBlueprint.rawBuildTime}
+                materialEfficiency={this.state.materialEfficiency}
+                timeEfficiency={this.state.timeEfficiency}
               />
             </Grid.Column>
 
@@ -221,6 +264,7 @@ class Manufacturing extends React.Component {
           <Grid.Row>
             <Grid.Column>
               <MaterialsTable
+                getMaterialQuantityAfterME={this.getMaterialQuantityAfterME}
                 blueprintBuildMaterials={this.state.blueprintBuildMaterials}
                 runs={this.state.runs}
               />
@@ -233,7 +277,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalVolumeInput"
                 disabled
-                value={formatNumbersWithCommas((this.state.totalMaterialVolume * this.state.runs).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialVolume()).toFixed(2))}
               />
 
             </Grid.Column>
@@ -242,7 +286,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalCostInput"
                 disabled
-                value={formatNumbersWithCommas((this.state.totalMaterialCost * this.state.runs).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialCost()).toFixed(2))}
               />
             </Grid.Column>
           </Grid.Row>
@@ -307,7 +351,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatTime(this.props.rawBuildTime)}
+                value={formatTime(this.props.rawBuildTime * (1 - (this.props.timeEfficiency / 50)))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -319,7 +363,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatTime(this.props.rawBuildTime * this.props.runs)}
+                value={formatTime((this.props.rawBuildTime * this.props.runs) * (1 - (this.props.timeEfficiency / 50)))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -357,7 +401,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas((this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.totalMaterialCost)).toFixed(2))}
+                value={formatNumbersWithCommas((this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost())).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -369,7 +413,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas((((this.props.quantityProduced * this.props.productSellPrice) - this.props.totalMaterialCost) / (this.props.rawBuildTime / 3600)).toFixed(2))}
+                value={formatNumbersWithCommas((((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) / (this.props.rawBuildTime / 3600)).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -398,11 +442,11 @@ class MaterialsTable extends React.Component {
           {this.props.blueprintBuildMaterials.map((material, index) => (
             <Table.Row key={index}>
               <Table.Cell key={index}>{material.typeName}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas(material.quantity * this.props.runs)}</Table.Cell>
+              <Table.Cell key={index}>{formatNumbersWithCommas(this.props.getMaterialQuantityAfterME(index))}</Table.Cell>
               <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.volume).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * material.quantity * this.props.runs).toFixed(2))}</Table.Cell>
+              <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
               <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.costPerItem).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * material.quantity * this.props.runs).toFixed(2))}</Table.Cell>
+              <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
 
             </Table.Row>
           ))}
