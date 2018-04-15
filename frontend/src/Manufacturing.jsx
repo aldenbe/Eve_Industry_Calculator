@@ -123,9 +123,9 @@ class Manufacturing extends React.Component {
   getMaterialQuantityAfterME = (materialIndex) => {
     let quantity = this.state.blueprintBuildMaterials[materialIndex].quantity;
     if(quantity === 1){
-      return quantity * this.state.runs
+      return quantity
     } else {
-      quantity = Math.ceil((quantity * this.state.runs) * (1 - this.state.materialEfficiency / 100));
+      quantity = Math.ceil((quantity) * (1 - this.state.materialEfficiency / 100));
     }
     return quantity
   }
@@ -276,7 +276,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalVolumeInput"
                 disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialVolume()).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialVolume() * this.props.runs).toFixed(2))}
               />
 
             </Grid.Column>
@@ -285,7 +285,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalCostInput"
                 disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialCost()).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialCost() * this.props.runs).toFixed(2))}
               />
             </Grid.Column>
           </Grid.Row>
@@ -443,9 +443,9 @@ class MaterialsTable extends React.Component {
               <Table.Cell key={index}>{material.typeName}</Table.Cell>
               <Table.Cell key={index}>{formatNumbersWithCommas(this.props.getMaterialQuantityAfterME(index))}</Table.Cell>
               <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.volume).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
+              <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * this.props.runs * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
               <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.costPerItem).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
+              <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * this.props.runs * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
 
             </Table.Row>
           ))}
