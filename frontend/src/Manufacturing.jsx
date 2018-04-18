@@ -612,7 +612,8 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas( (this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) - (this.props.getJobGrossCost() + this.props.getJobInstallTax()) ).toFixed(2))}
+                value={formatNumbersWithCommas(
+                   (this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) - (this.props.getJobGrossCost() + this.props.getJobInstallTax()) ).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -628,9 +629,9 @@ class OutputInformation extends React.Component {
                   (
                     (
                       (
-                        (this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()
+                        this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost())
                       ) - (this.props.getJobGrossCost() + this.props.getJobInstallTax())
-                    ) / (this.props.rawBuildTime / 3600)
+                    ) / (this.props.runs * (this.props.rawBuildTime / 3600))
                   ).toFixed(2)
                 )}
                 style={{width:'100%'}}
