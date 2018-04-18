@@ -14,6 +14,8 @@ class Manufacturing extends React.Component {
   constructor(props){
     super(props);
     this.state = {
+      constIndices: {},
+      typeValues: {},
       universe: universe,
       productSellPrice: 0,
       blueprintTypes: manufacturingConstants.blueprintTypes,
@@ -54,6 +56,59 @@ class Manufacturing extends React.Component {
   }
   componentDidMount() {
     this.getBlueprints();
+    this.getCostIndices();
+    this.getTypeValues();
+  }
+  getCostIndices = () => {
+    let costIndices = {};
+    fetch('https://esi.tech.ccp.is/latest/industry/systems/?datasource=tranquility', {
+      retryOn: [500, 502],
+      retryDelay: 250,
+      method: 'GET',
+      headers: {
+        "Content-Type": "application/json"
+      }
+    }).then(response => {
+      if (response.ok){
+        return response.json()
+      }
+    }).then(json => {
+      for (let i = 0; i < json.length; i++){
+        costIndices[json[i].solar_system_id] = {costIndices: {}};
+        for (let j = 0; j < json[i].cost_indices.length; j++){
+          costIndices[json[i].solar_system_id].costIndices[json[i].cost_indices[j].activity] = json[i].cost_indices[j].cost_index;
+        }
+      }
+      this.setState({
+        costIndices: costIndices
+      })
+    });
+  }
+  getTypeValues = () => {
+    let typeValues = {};
+    fetch('https://esi.tech.ccp.is/latest/markets/prices/?datasource=tranquility', {
+      retryOn: [500, 502],
+      retryDelay: 250,
+      method: 'GET',
+      headers: {
+        "Content-Type": "application/json"
+      }
+    }).then(response => {
+      if (response.ok){
+        return response.json()
+      }
+    }).then(json => {
+      for (let i = 0; i < json.length; i++){
+        typeValues[json[i].type_id] = {
+          averagePrice: json[i].average_price,
+          adjustedPrice: json[i].adjusted_price
+        };
+
+      }
+      this.setState({
+        typeValues: typeValues
+      })
+    });
   }
   handleBlueprintSelection = (e, { value }) => {
     if(this.state.selectedBlueprint.typeID !== value){
@@ -116,12 +171,29 @@ class Manufacturing extends React.Component {
       });
     }
   }
+  getJobGrossCost = () => {
+    let jobGrossCost = 0;
+    if(this.state.selectedBlueprint.typeID && this.state.costIndices != {} && this.state.typeValues != {}){
+      let totalExpectedValue = 0;
+      for(let i = 0; i < this.state.blueprintBuildMaterials.length; i ++){
+        totalExpectedValue += this.state.typeValues[this.state.blueprintBuildMaterials[i].materialTypeID].adjustedPrice * this.state.blueprintBuildMaterials[i].quantity;
+      }
+      jobGrossCost = this.state.costIndices[this.state.selectedBuildLocation.selectedSystem].costIndices.manufacturing * totalExpectedValue;
+    }
+    return jobGrossCost * this.state.runs
+  }
   getProductPrice = () => {
     getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedBlueprint.productTypeID).then(minSellPrice => {
       this.setState({
         productSellPrice: minSellPrice
       })
     })
+  }
+  getJobInstallTax = () => {
+    let jobGrossCost = this.getJobGrossCost();
+    //FIXME: get actual station tax
+    let tax = 0.1;
+    return jobGrossCost * tax;
   }
   getBlueprintMaterials = (selectedBlueprint) => {
     if(selectedBlueprint != null){
@@ -227,6 +299,7 @@ class Manufacturing extends React.Component {
       if(this.state.selectedBlueprint.typeID){
         this.getProductPrice();
         this.getMaterialSellValues(this.state.blueprintBuildMaterials);
+
       }
     })
   }
@@ -339,6 +412,8 @@ class Manufacturing extends React.Component {
                 rawBuildTime={this.state.selectedBlueprint.rawBuildTime}
                 materialEfficiency={this.state.materialEfficiency}
                 timeEfficiency={this.state.timeEfficiency}
+                getJobGrossCost={this.getJobGrossCost}
+                getJobInstallTax={this.getJobInstallTax}
               />
             </Grid.Column>
 
@@ -363,7 +438,16 @@ class Manufacturing extends React.Component {
               locationType="sell"
             />
           </Grid.Row>
-          
+          <Grid.Row>
+            Build:
+            <LocationSelection
+              changeLocationSelection={this.changeLocationSelection}
+              selectedLocation={this.state.selectedBuildLocation}
+              universe={this.state.universe}
+              updateUniverse={this.updateUniverse}
+              locationType="build"
+            />
+          </Grid.Row>
           <Grid.Row>
             <Grid.Column>
               <MaterialsTable
@@ -499,12 +583,36 @@ class OutputInformation extends React.Component {
           </Grid.Row>
           <Grid.Row>
             <Grid.Column>
+              <p>Job gross cost: </p>
+            </Grid.Column>
+            <Grid.Column>
+              <Input
+                disabled
+                value={formatNumbersWithCommas(this.props.getJobGrossCost().toFixed(2))}
+                style={{width:'100%'}}
+              />
+            </Grid.Column>
+          </Grid.Row>
+          <Grid.Row>
+            <Grid.Column>
+              <p>Job install tax: </p>
+            </Grid.Column>
+            <Grid.Column>
+              <Input
+                disabled
+                value={formatNumbersWithCommas(this.props.getJobInstallTax().toFixed(2))}
+                style={{width:'100%'}}
+              />
+            </Grid.Column>
+          </Grid.Row>
+          <Grid.Row>
+            <Grid.Column>
               <p>Total Profit: </p>
             </Grid.Column>
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas((this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost())).toFixed(2))}
+                value={formatNumbersWithCommas( (this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) - (this.props.getJobGrossCost() + this.props.getJobInstallTax()) ).toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -516,7 +624,15 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas((((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) / (this.props.rawBuildTime / 3600)).toFixed(2))}
+                value={formatNumbersWithCommas(
+                  (
+                    (
+                      (
+                        (this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()
+                      ) - (this.props.getJobGrossCost() + this.props.getJobInstallTax())
+                    ) / (this.props.rawBuildTime / 3600)
+                  ).toFixed(2)
+                )}
                 style={{width:'100%'}}
               />
             </Grid.Column>
