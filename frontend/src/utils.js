@@ -3,7 +3,7 @@ const formatNumbersWithCommas = (number) => {
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-const getMinSellValue = (regionID, typeID) => {
+const getMinSellValue = (regionID, solarSystemID, stationID, typeID) => {
   return fetch('https://esi.tech.ccp.is/latest/markets/' + regionID + '/orders/?order_type=sell&type_id=' + typeID, {
     retryOn: [500, 502],
     retryDelay: 250,
@@ -18,13 +18,22 @@ const getMinSellValue = (regionID, typeID) => {
   }).then(json => {
 
     //get minimum price or set 0 if no price available
-    let minPrice = 0;
+    let minPrice = 0.0;
     if (json.length > 0){
       minPrice = json[0].price;
-      for (let j = 1, len=json.length; j < len; j++){
-        let curPrice = json[j].price;
-        minPrice = (curPrice < minPrice) ? curPrice : minPrice;
+      if(stationID){
+        for (let j = 1, len=json.length; j < len; j++){
+          if(json[j].location_id != stationID) continue;
+          let curPrice = json[j].price;
+          minPrice = (curPrice < minPrice) ? curPrice : minPrice;
+        }
+      } else {
+        for (let j = 1, len=json.length; j < len; j++){
+          let curPrice = json[j].price;
+          minPrice = (curPrice < minPrice) ? curPrice : minPrice;
+        }
       }
+
     }
 
     return minPrice;
@@ -40,7 +49,7 @@ const formatTime = (seconds) => {
   return (days + ":" + pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2));
 }
 
-const   pad = (num, size) => {
+const pad = (num, size) => {
     var s = num+"";
     while (s.length < size) s = "0" + s;
     return s;
