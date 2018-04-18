@@ -31,6 +31,6 @@ if($result = $conn->query($reactionSelect)){
   }
   echo(json_encode(utf8ize($rows)));
 } else {
-  echo(json_encode($result->error));
+  echo(json_encode($conn->error_list));
 }
 $conn->close();

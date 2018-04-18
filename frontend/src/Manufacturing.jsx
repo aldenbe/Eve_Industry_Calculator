@@ -1,10 +1,12 @@
 import React from 'react';
-import { Container, Dropdown, Grid, Form, Checkbox, Input, Table } from 'semantic-ui-react';
+import { Dropdown, Grid, Form, Checkbox, Input, Table } from 'semantic-ui-react';
 import './Manufacturing.css';
 import manufacturingConstants from './constants/ManufacturingConstants.json';
+import universe from './constants/Universe.json';
 import { API_ROOT, ICON_ROOT } from './api-config';
-var fetch = require('fetch-retry');
+import LocationSelection from './LocationSelection';
 
+var fetch = require('fetch-retry');
 var getMinSellValue = require('./utils.js').getMinSellValue;
 var formatNumbersWithCommas = require('./utils.js').formatNumbersWithCommas;
 var formatTime = require('./utils.js').formatTime;
@@ -12,6 +14,7 @@ class Manufacturing extends React.Component {
   constructor(props){
     super(props);
     this.state = {
+      universe: universe,
       productSellPrice: 0,
       blueprintTypes: manufacturingConstants.blueprintTypes,
       blueprints: [],
@@ -28,7 +31,28 @@ class Manufacturing extends React.Component {
       runs: 0,
       materialEfficiency: 0,
       timeEfficiency: 0,
+      selectedRegion: 10000002,
+      selectedSystem: 30000142,
+      selectedStation: 60003760,
+      selectedBuyLocation: {
+        selectedRegion: "10000002",
+        selectedSystem: "30000142",
+        selectedStation: "60003760",
+      },
+      selectedSellLocation: {
+        selectedRegion: "10000002",
+        selectedSystem: "30000142",
+        selectedStation: "60003760",
+      },
+      selectedBuildLocation: {
+        selectedRegion: "10000002",
+        selectedSystem: "30000142",
+        selectedStation: "60003760",
+      },
     }
+
+  }
+  componentDidMount() {
     this.getBlueprints();
   }
   handleBlueprintSelection = (e, { value }) => {
@@ -84,17 +108,20 @@ class Manufacturing extends React.Component {
             this.setState({
               selectedBlueprint: blueprintResponse,
               runs: blueprintResponse.maxProductionLimit,
-            })
-            getMinSellValue(this.state.regionID, blueprintResponse.productTypeID).then(minSellPrice => {
-              this.setState({
-                productSellPrice: minSellPrice
-              })
-            })
+            }, this.getProductPrice)
 
           })
+
         }
       });
     }
+  }
+  getProductPrice = () => {
+    getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedBlueprint.productTypeID).then(minSellPrice => {
+      this.setState({
+        productSellPrice: minSellPrice
+      })
+    })
   }
   getBlueprintMaterials = (selectedBlueprint) => {
     if(selectedBlueprint != null){
@@ -145,18 +172,18 @@ class Manufacturing extends React.Component {
   }
 
   getMaterialSellValues = (blueprintBuildMaterials) => {
-    var promises = [];
+    let materialValuePromises = [];
     for (let i = 0; i < blueprintBuildMaterials.length; i++) {
 
-      var promise = getMinSellValue(this.state.regionID, blueprintBuildMaterials[i].materialTypeID).then((minPrice) => {
+      let promise = getMinSellValue(this.state.selectedBuyLocation.selectedRegion, this.state.selectedBuyLocation.selectedSystem, this.state.selectedBuyLocation.selectedStation, blueprintBuildMaterials[i].materialTypeID).then((minPrice) => {
         blueprintBuildMaterials[i].costPerItem = minPrice;
       });
 
 
-      promises.push(promise);
+      materialValuePromises.push(promise);
     }
     //after all prices are fetched update state
-    Promise.all(promises).then((values) => {
+    Promise.all(materialValuePromises).then(() => {
 
       this.setState({
         blueprintBuildMaterials: blueprintBuildMaterials,
@@ -174,6 +201,62 @@ class Manufacturing extends React.Component {
     this.setState({
       [e.target.name]: e.target.value,
     });
+  }
+  changeLocationSelection = (locationType, station, system, region) => {
+    let selectedLocation
+    switch(locationType) {
+      case 'buy':
+        selectedLocation = 'selectedBuyLocation';
+        break;
+      case 'sell':
+        selectedLocation = 'selectedSellLocation';
+        break;
+      case 'build':
+        selectedLocation = 'selectedBuildLocation';
+        break;
+    }
+    region = region || this.state[selectedLocation].selectedRegion;
+    system = system || this.state[selectedLocation].selectedSystem;
+    this.setState({
+      [selectedLocation]: {
+        selectedRegion: region,
+        selectedSystem: system,
+        selectedStation: station,
+      }
+    }, () => {
+      if(this.state.selectedBlueprint.typeID){
+        this.getProductPrice();
+        this.getMaterialSellValues(this.state.blueprintBuildMaterials);
+      }
+    })
+  }
+  updateUniverse = (regionID, solarSystemID, stationsToAdd) => {
+    let universe = this.state.universe;
+    //let stations = this.state.universe[regionID].solarSystems[solarSystemID].stations;
+    if(stationsToAdd.length > 0){
+      for(let i = 0; i < stationsToAdd.length; i++){
+        if(universe[regionID].systems[solarSystemID].stations.length == 0){
+          universe[regionID].systems[solarSystemID].stations = {
+            [stationsToAdd[i].stationID]: {
+              stationName: stationsToAdd[i].name,
+              corporationID: stationsToAdd[i].corporationID
+            }
+          };
+        } else {
+          universe[regionID].systems[solarSystemID].stations[stationsToAdd[i].stationID] = {
+            stationName: stationsToAdd[i].name,
+            corporationID: stationsToAdd[i].corporationID
+          }
+        }
+
+      }
+      this.setState({
+        //universe[regionID].solarSystems[solarSystems].stations: stations
+        universe: universe
+      })
+    }
+
+
   }
 
   render() {
@@ -198,7 +281,7 @@ class Manufacturing extends React.Component {
                     <Grid>
                       <Grid.Row>
                         <Grid.Column>
-                          <label for='runsInput'>Runs: </label>
+                          <label htmlFor='runsInput'>Runs: </label>
                           <Input
                           style={{width:'70%'}}
                           id="runsInput"
@@ -214,7 +297,7 @@ class Manufacturing extends React.Component {
                       </Grid.Row>
                       <Grid.Row columns='equal'>
                         <Grid.Column>
-                          <label for="meInput">ME: </label>
+                          <label htmlFor="meInput">ME: </label>
                             <Input
                             style={{width:'40px'}}
                             id="meInput"
@@ -226,7 +309,7 @@ class Manufacturing extends React.Component {
                             />
                         </Grid.Column>
                         <Grid.Column>
-                          <label for="teInput">TE: </label>
+                          <label htmlFor="teInput">TE: </label>
                             <Input
                               style={{width:'40px'}}
                             id="teInput"
@@ -261,6 +344,27 @@ class Manufacturing extends React.Component {
 
           </Grid.Row>
           <Grid.Row>
+            Buy:
+            <LocationSelection
+              changeLocationSelection={this.changeLocationSelection}
+              selectedLocation={this.state.selectedBuyLocation}
+              universe={this.state.universe}
+              updateUniverse={this.updateUniverse}
+              locationType="buy"
+            />
+          </Grid.Row>
+          <Grid.Row>
+            Sell:
+            <LocationSelection
+              changeLocationSelection={this.changeLocationSelection}
+              selectedLocation={this.state.selectedSellLocation}
+              universe={this.state.universe}
+              updateUniverse={this.updateUniverse}
+              locationType="sell"
+            />
+          </Grid.Row>
+          
+          <Grid.Row>
             <Grid.Column>
               <MaterialsTable
                 getMaterialQuantityAfterME={this.getMaterialQuantityAfterME}
@@ -276,7 +380,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalVolumeInput"
                 disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialVolume() * this.props.runs).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialVolume() * this.state.runs).toFixed(2))}
               />
 
             </Grid.Column>
@@ -285,7 +389,7 @@ class Manufacturing extends React.Component {
               <Input
                 id="totalCostInput"
                 disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialCost() * this.props.runs).toFixed(2))}
+                value={formatNumbersWithCommas((this.getTotalMaterialCost() * this.state.runs).toFixed(2))}
               />
             </Grid.Column>
           </Grid.Row>
@@ -294,7 +398,7 @@ class Manufacturing extends React.Component {
     )
   }
 }
-export default Manufacturing
+
 
 class BlueprintSelection extends React.Component {
   render (){
@@ -455,3 +559,5 @@ class MaterialsTable extends React.Component {
     )
   }
 }
+
+export default Manufacturing
