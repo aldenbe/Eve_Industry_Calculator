@@ -20,7 +20,11 @@ class Reactions extends React.Component {
       },
       selectedReactionTypeIndex: 0,
       reactionBuildMaterials: [],
-      regionID: '10000002',
+      selectedBuyLocation: {
+        selectedRegion: "10000002",
+        selectedSystem: "30000142",
+        selectedStation: "60003760",
+      },
       runs: 1,
       totalMaterialCost: 0,
       totalMaterialVolume: 0,
@@ -73,7 +77,7 @@ class Reactions extends React.Component {
             this.setState({
               selectedReaction: reactionResponse,
             })
-            getMinSellValue(this.state.regionID, reactionResponse.productTypeID).then(minSellPrice => {
+            getMinSellValue(this.state.selectedBuyLocation.selectedRegion, this.state.selectedBuyLocation.selectedSystem, this.state.selectedBuyLocation.selectedStation, reactionResponse.productTypeID).then(minSellPrice => {
               this.setState({
                 productSellPrice: minSellPrice
               })
@@ -111,7 +115,7 @@ class Reactions extends React.Component {
     var promises = [];
     for (let i = 0; i < reactionBuildMaterials.length; i++) {
 
-      var promise = getMinSellValue(this.state.regionID, reactionBuildMaterials[i].materialTypeID).then((minPrice) => {
+      var promise = getMinSellValue(this.state.selectedBuyLocation.selectedRegion, this.state.selectedBuyLocation.selectedSystem, this.state.selectedBuyLocation.selectedStation, reactionBuildMaterials[i].materialTypeID).then((minPrice) => {
         reactionBuildMaterials[i].costPerItem = minPrice;
       });
 

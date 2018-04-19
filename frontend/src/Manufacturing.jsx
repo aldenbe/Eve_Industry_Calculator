@@ -33,9 +33,6 @@ class Manufacturing extends React.Component {
       runs: 0,
       materialEfficiency: 0,
       timeEfficiency: 0,
-      selectedRegion: 10000002,
-      selectedSystem: 30000142,
-      selectedStation: 60003760,
       selectedBuyLocation: {
         selectedRegion: "10000002",
         selectedSystem: "30000142",
@@ -224,7 +221,7 @@ class Manufacturing extends React.Component {
     if(quantity === 1){
       return quantity
     } else {
-      quantity = Math.ceil((quantity) * (1 - this.state.materialEfficiency / 100));
+      quantity = Math.ceil((quantity) * this.state.runs * (1 - this.state.materialEfficiency / 100));
     }
     return quantity
   }
