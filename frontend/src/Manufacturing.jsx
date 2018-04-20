@@ -219,7 +219,7 @@ class Manufacturing extends React.Component {
   getMaterialQuantityAfterME = (materialIndex) => {
     let quantity = this.state.blueprintBuildMaterials[materialIndex].quantity;
     if(quantity === 1){
-      return quantity
+      return quantity * this.state.runs
     } else {
       quantity = Math.ceil((quantity) * this.state.runs * (1 - this.state.materialEfficiency / 100));
     }
@@ -524,7 +524,34 @@ class BlueprintSelection extends React.Component {
 }
 
 class OutputInformation extends React.Component {
+  constructor(props){
+    super(props);
+
+
+  }
+  getRawBuildTime = () => {
+    return formatTime(this.props.rawBuildTime * (1 - (this.props.timeEfficiency / 50)));
+  }
+  getTotalBuildTime = () => {
+    return formatTime((this.props.rawBuildTime * this.props.runs) * (1 - (this.props.timeEfficiency / 50)))
+  }
+  getTotalProfit = () => {
+    let totalMaterialCost = this.props.getTotalMaterialCost();
+    let jobGrossCost = this.props.getJobGrossCost();
+    let runs = this.props.runs;
+    let quantityProduced = this.props.quantityProduced;
+    let productSellPrice = this.props.productSellPrice;
+    let jobInstallTax = this.props.getJobInstallTax();
+    let totalProfit = ( (runs * quantityProduced * productSellPrice ) - totalMaterialCost) - (jobGrossCost + jobInstallTax);
+    return totalProfit
+  }
+  getIskPerHour = () => {
+    let totalProfit = this.getTotalProfit();
+    let iskPerHour = totalProfit / (this.props.runs * (this.props.rawBuildTime / 3600));
+    return iskPerHour
+  }
   render() {
+
     return (
       <Grid.Column width={4}>
         <Grid columns='equal'>
@@ -535,7 +562,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatTime(this.props.rawBuildTime * (1 - (this.props.timeEfficiency / 50)))}
+                value={this.getRawBuildTime()}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -547,12 +574,10 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatTime((this.props.rawBuildTime * this.props.runs) * (1 - (this.props.timeEfficiency / 50)))}
+                value={this.getTotalBuildTime()}
                 style={{width:'100%'}}
               />
             </Grid.Column>
-
-
           </Grid.Row>
           <Grid.Row>
             <Grid.Column>
@@ -609,8 +634,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas(
-                   (this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) - (this.props.getJobGrossCost() + this.props.getJobInstallTax()) ).toFixed(2))}
+                value={formatNumbersWithCommas(this.getTotalProfit().toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
@@ -622,15 +646,7 @@ class OutputInformation extends React.Component {
             <Grid.Column>
               <Input
                 disabled
-                value={formatNumbersWithCommas(
-                  (
-                    (
-                      (
-                        this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost())
-                      ) - (this.props.getJobGrossCost() + this.props.getJobInstallTax())
-                    ) / (this.props.runs * (this.props.rawBuildTime / 3600))
-                  ).toFixed(2)
-                )}
+                value={formatNumbersWithCommas(this.getIskPerHour().toFixed(2))}
                 style={{width:'100%'}}
               />
             </Grid.Column>
