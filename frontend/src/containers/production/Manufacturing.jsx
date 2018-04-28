@@ -1,15 +1,18 @@
 import React from 'react';
-import { Dropdown, Grid, Form, Checkbox, Input, Table } from 'semantic-ui-react';
+import { Dropdown, Grid, Form, Checkbox, Input, Table, Button } from 'semantic-ui-react';
 import './Manufacturing.css';
-import manufacturingConstants from './constants/ManufacturingConstants.json';
-import universe from './constants/Universe.json';
-import { API_ROOT, ICON_ROOT } from './api-config';
-import LocationSelection from './LocationSelection';
+import manufacturingConstants from 'constants/ManufacturingConstants.json';
+import universe from 'constants/Universe.json';
+import { API_ROOT, ICON_ROOT } from 'APIConfig';
+import LocationSelection from 'components/LocationSelection';
+import { MaterialsTable, Totals } from 'components/production/MaterialsTable';
+import BlueprintSelection from 'components/production/BlueprintSelection';
+import OutputInformation from 'components/production/OutputInformation';
+import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost } from 'utils/production';
+import { formatNumbersWithCommas, formatTime } from 'utils/general';
 
 var fetch = require('fetch-retry');
-var getMinSellValue = require('./utils.js').getMinSellValue;
-var formatNumbersWithCommas = require('./utils.js').formatNumbersWithCommas;
-var formatTime = require('./utils.js').formatTime;
+
 class Manufacturing extends React.Component {
   constructor(props){
     super(props);
@@ -33,9 +36,6 @@ class Manufacturing extends React.Component {
       runs: 0,
       materialEfficiency: 0,
       timeEfficiency: 0,
-      selectedRegion: 10000002,
-      selectedSystem: 30000142,
-      selectedStation: 60003760,
       selectedBuyLocation: {
         selectedRegion: "10000002",
         selectedSystem: "30000142",
@@ -56,66 +56,20 @@ class Manufacturing extends React.Component {
   }
   componentDidMount() {
     this.getBlueprints();
-    this.getCostIndices();
-    this.getTypeValues();
+    getCostIndices(this);
+    getTypeValues(this);
   }
-  getCostIndices = () => {
-    let costIndices = {};
-    fetch('https://esi.tech.ccp.is/latest/industry/systems/?datasource=tranquility', {
-      retryOn: [500, 502],
-      retryDelay: 250,
-      method: 'GET',
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }).then(response => {
-      if (response.ok){
-        return response.json()
-      }
-    }).then(json => {
-      for (let i = 0; i < json.length; i++){
-        costIndices[json[i].solar_system_id] = {costIndices: {}};
-        for (let j = 0; j < json[i].cost_indices.length; j++){
-          costIndices[json[i].solar_system_id].costIndices[json[i].cost_indices[j].activity] = json[i].cost_indices[j].cost_index;
-        }
-      }
-      this.setState({
-        costIndices: costIndices
-      })
-    });
-  }
-  getTypeValues = () => {
-    let typeValues = {};
-    fetch('https://esi.tech.ccp.is/latest/markets/prices/?datasource=tranquility', {
-      retryOn: [500, 502],
-      retryDelay: 250,
-      method: 'GET',
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }).then(response => {
-      if (response.ok){
-        return response.json()
-      }
-    }).then(json => {
-      for (let i = 0; i < json.length; i++){
-        typeValues[json[i].type_id] = {
-          averagePrice: json[i].average_price,
-          adjustedPrice: json[i].adjusted_price
-        };
 
-      }
-      this.setState({
-        typeValues: typeValues
-      })
-    });
-  }
+
+
+
   handleBlueprintSelection = (e, { value }) => {
     if(this.state.selectedBlueprint.typeID !== value){
       this.getBlueprintDetails(value);
       this.getBlueprintMaterials(value);
     }
   };
+
   handleBlueprintTypeSelectionChange = (e, {value}) => {
     if(this.state.selectedBlueprintTypeIndex !== value){
       this.setState({
@@ -123,6 +77,7 @@ class Manufacturing extends React.Component {
       }, () => {this.getBlueprints();});
     }
   };
+
   getBlueprints = () => {
     fetch(API_ROOT + 'getblueprints.php', {
       retryOn: [500, 502],
@@ -171,17 +126,18 @@ class Manufacturing extends React.Component {
       });
     }
   }
+
   getJobGrossCost = () => {
-    let jobGrossCost = 0;
-    if(this.state.selectedBlueprint.typeID && this.state.costIndices != {} && this.state.typeValues != {}){
-      let totalExpectedValue = 0;
-      for(let i = 0; i < this.state.blueprintBuildMaterials.length; i ++){
-        totalExpectedValue += this.state.typeValues[this.state.blueprintBuildMaterials[i].materialTypeID].adjustedPrice * this.state.blueprintBuildMaterials[i].quantity;
-      }
-      jobGrossCost = this.state.costIndices[this.state.selectedBuildLocation.selectedSystem].costIndices.manufacturing * totalExpectedValue;
-    }
-    return jobGrossCost * this.state.runs
+    return calculateJobGrossCost(this.state.selectedBlueprint.typeID, this.state.costIndices, this.state.typeValues, this.state.blueprintBuildMaterials, this.state.runs, this.state.selectedBuildLocation.selectedSystem, 'manufacturing')
   }
+
+  getJobInstallTax = () => {
+    let jobGrossCost = this.getJobGrossCost();
+    //FIXME: get actual station tax
+    let tax = 0.1;
+    return jobGrossCost * tax;
+  }
+
   getProductPrice = () => {
     getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedBlueprint.productTypeID).then(minSellPrice => {
       this.setState({
@@ -189,12 +145,7 @@ class Manufacturing extends React.Component {
       })
     })
   }
-  getJobInstallTax = () => {
-    let jobGrossCost = this.getJobGrossCost();
-    //FIXME: get actual station tax
-    let tax = 0.1;
-    return jobGrossCost * tax;
-  }
+
   getBlueprintMaterials = (selectedBlueprint) => {
     if(selectedBlueprint != null){
       fetch(API_ROOT + 'getblueprintmaterials.php', {
@@ -222,12 +173,13 @@ class Manufacturing extends React.Component {
   getMaterialQuantityAfterME = (materialIndex) => {
     let quantity = this.state.blueprintBuildMaterials[materialIndex].quantity;
     if(quantity === 1){
-      return quantity
+      return quantity * this.state.runs
     } else {
-      quantity = Math.ceil((quantity) * (1 - this.state.materialEfficiency / 100));
+      quantity = Math.ceil((quantity) * this.state.runs * (1 - this.state.materialEfficiency / 100));
     }
     return quantity
   }
+
   getTotalMaterialVolume = () => {
     let totalVolume = 0;
     for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
@@ -235,6 +187,7 @@ class Manufacturing extends React.Component {
     }
     return totalVolume
   }
+
   getTotalMaterialCost = () => {
     let totalCost = 0;
     for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
@@ -274,6 +227,8 @@ class Manufacturing extends React.Component {
       [e.target.name]: e.target.value,
     });
   }
+
+  //FIXME: refactor location and universe
   changeLocationSelection = (locationType, station, system, region) => {
     let selectedLocation
     switch(locationType) {
@@ -303,6 +258,7 @@ class Manufacturing extends React.Component {
       }
     })
   }
+
   updateUniverse = (regionID, solarSystemID, stationsToAdd) => {
     let universe = this.state.universe;
     //let stations = this.state.universe[regionID].solarSystems[solarSystemID].stations;
@@ -328,8 +284,6 @@ class Manufacturing extends React.Component {
         universe: universe
       })
     }
-
-
   }
 
   render() {
@@ -338,6 +292,7 @@ class Manufacturing extends React.Component {
         <Grid>
           <Grid.Row> {/*First component row*/}
             <BlueprintSelection
+              placeholder={'Select Blueprint'}
               blueprints={this.state.blueprints}
               handleBlueprintSelection={this.handleBlueprintSelection}
               blueprintTypes={this.state.blueprintTypes}
@@ -458,220 +413,13 @@ class Manufacturing extends React.Component {
             </Grid.Column>
 
           </Grid.Row>
-          <Grid.Row columns='equal'>
-            <Grid.Column>
-              <label htmlFor="totalVolumeInput">Total Material Volume: </label>
-              <Input
-                id="totalVolumeInput"
-                disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialVolume() * this.state.runs).toFixed(2))}
-              />
-
-            </Grid.Column>
-            <Grid.Column>
-              <label htmlFor="totalCostInput">Total Material Cost: </label>
-              <Input
-                id="totalCostInput"
-                disabled
-                value={formatNumbersWithCommas((this.getTotalMaterialCost() * this.state.runs).toFixed(2))}
-              />
-            </Grid.Column>
-          </Grid.Row>
+          <Totals
+            runs={this.state.runs}
+            totalMaterialCost={this.getTotalMaterialCost()}
+            totalMaterialVolume={this.getTotalMaterialVolume()}
+          />
         </Grid>
       </div>
-    )
-  }
-}
-
-
-class BlueprintSelection extends React.Component {
-  render (){
-    return (
-      <Grid.Column width={6}>
-        <Grid.Row>
-          <Grid.Column>
-            <Dropdown placeholder="Select Blueprint"
-              fluid
-              search
-              selection
-              options={this.props.blueprints}
-              onChange={this.props.handleBlueprintSelection}
-              />
-          </Grid.Column>
-        </Grid.Row>
-        <Grid.Row>
-          <Grid.Column>
-            <Form>
-              {/*Map blueprint selection options to form fields*/}
-              {this.props.blueprintTypes.map((blueprintType, index) => (
-
-                <Form.Field key={index}>
-                  <Checkbox
-                    radio
-                    label={blueprintType.label}
-                    value={index}
-                    key={index}
-                    checked={this.props.selectedBlueprintTypeIndex === index}
-                    onChange={this.props.handleBlueprintTypeSelectionChange}
-                    className="small-checkbox"
-                  />
-                </Form.Field>
-
-              ))}
-            </Form>
-          </Grid.Column>
-        </Grid.Row>
-      </Grid.Column>
-    )
-  }
-}
-
-class OutputInformation extends React.Component {
-  render() {
-    return (
-      <Grid.Column width={4}>
-        <Grid columns='equal'>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Time per run: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatTime(this.props.rawBuildTime * (1 - (this.props.timeEfficiency / 50)))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-            <p>Total build time: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatTime((this.props.rawBuildTime * this.props.runs) * (1 - (this.props.timeEfficiency / 50)))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-
-
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Sell Price: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas((this.props.productSellPrice).toFixed(2))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Produced: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas(this.props.quantityProduced * this.props.runs)}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Job gross cost: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas(this.props.getJobGrossCost().toFixed(2))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Job install tax: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas(this.props.getJobInstallTax().toFixed(2))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Total Profit: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas( (this.props.runs * ((this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()) - (this.props.getJobGrossCost() + this.props.getJobInstallTax()) ).toFixed(2))}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-          <Grid.Row>
-            <Grid.Column>
-              <p>Isk Per Hour: </p>
-            </Grid.Column>
-            <Grid.Column>
-              <Input
-                disabled
-                value={formatNumbersWithCommas(
-                  (
-                    (
-                      (
-                        (this.props.quantityProduced * this.props.productSellPrice) - this.props.getTotalMaterialCost()
-                      ) - (this.props.getJobGrossCost() + this.props.getJobInstallTax())
-                    ) / (this.props.rawBuildTime / 3600)
-                  ).toFixed(2)
-                )}
-                style={{width:'100%'}}
-              />
-            </Grid.Column>
-          </Grid.Row>
-        </Grid>
-      </Grid.Column>
-    )
-  }
-}
-class MaterialsTable extends React.Component {
-  render() {
-    return(
-      <Table>
-        <Table.Header>
-          <Table.Row>
-            <Table.HeaderCell>Material</Table.HeaderCell>
-            <Table.HeaderCell>Quantity</Table.HeaderCell>
-            <Table.HeaderCell>Volume</Table.HeaderCell>
-            <Table.HeaderCell>Total Volume</Table.HeaderCell>
-            <Table.HeaderCell>Cost</Table.HeaderCell>
-            <Table.HeaderCell>Total Cost</Table.HeaderCell>
-
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {this.props.blueprintBuildMaterials.map((material, index) => (
-            <Table.Row key={index}>
-              <Table.Cell key={index}>{material.typeName}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas(this.props.getMaterialQuantityAfterME(index))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.volume).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * this.props.runs * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.costPerItem).toFixed(2))}</Table.Cell>
-              <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * this.props.runs * this.props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
-
-            </Table.Row>
-          ))}
-        </Table.Body>
-
-      </Table>
     )
   }
 }

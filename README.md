@@ -6,9 +6,9 @@ Eve Industry Calculator is a simple industry tool web app for the mmorpg Eve Onl
 
 In order to set up a developer environment to work on this project, please first clone this repository and follow the following steps.
 1. Obtain the current SDE from https://developers.eveonline.com/resource/resources and convert to MySQL, or obtain a freely available pre converted version, and host that at an accessible location
-2. Modify the connecttemplate.php file found in backend/ to match your MySQL database information and rename it to connect.php, this file is in the .gitignore to protect your account information.
+2. Modify the securevariablestemplate.php file found in backend/ to match your MySQL database information and rename it to securevariables.php, this file is in the .gitignore to protect your account information.
 3. Host the backend directory using a PHP compatible server
-4. Modify frontend/src/api-config.js to reflect your backend hosting location
+4. Modify frontend/src/APIConfig.js to reflect your backend hosting location
 5. Navigate to the frontend directory and run npm install to install all dependencies
 6. You can now run npm start in the frontend directory to run your own local version of Eve Industry Calculator
 

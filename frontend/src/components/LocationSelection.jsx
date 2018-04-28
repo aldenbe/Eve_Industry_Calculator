@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dropdown, Grid } from 'semantic-ui-react';
-import { API_ROOT } from './api-config';
+import { API_ROOT } from 'APIConfig';
 
 var fetch = require('fetch-retry');
 

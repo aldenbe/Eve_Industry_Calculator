@@ -54,11 +54,10 @@ typings/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
+
 
 # contains sensitive passwords
-connect.php
+securevariables.php
 
 # FIXME: Just some local stuff that i'm not sure about yet, clean this up later
 Types/

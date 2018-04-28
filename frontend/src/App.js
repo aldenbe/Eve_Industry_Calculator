@@ -2,24 +2,13 @@ import React, { Component } from 'react';
 import { Redirect, BrowserRouter, NavLink, Route, Switch } from 'react-router-dom';
 import { Container } from 'semantic-ui-react';
 import 'semantic-ui-css/semantic.min.css';
-import Manufacturing from './Manufacturing';
-import About from './About';
-import Reactions from './Reactions';
+import Manufacturing from './containers/production/Manufacturing';
+import About from './containers/About';
+import Reactions from './containers/production/Reactions';
+import testsso from './containers/testsso';
 
 import './App.css';
-
-
 class App extends Component {
-
-  constructor (props) {
-    super(props)
-    this.state = {
-
-    }
-  }
-  handleLink = (e) => {
-    console.log(e);
-  }
 
   render() {
     return (
@@ -44,6 +33,7 @@ class App extends Component {
               <Route path="/Manufacturing" component={Manufacturing} />
               <Route path="/Reactions" component={Reactions} />
               <Route path="/About" component={About} />
+              <Route path="/testsso" component={testsso} />
 
             </Switch>
           </Container>
@@ -52,4 +42,5 @@ class App extends Component {
     );
   }
 }
-export default App;
+
+export default App

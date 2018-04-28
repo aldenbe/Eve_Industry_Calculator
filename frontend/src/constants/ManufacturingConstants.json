@@ -8,5 +8,11 @@
       "type": "ships",
       "label": "Ships"
     }
+  ],
+  "reactionTypes": [
+    {
+      "type": "all",
+      "label": "All"
+    }
   ]
 }
