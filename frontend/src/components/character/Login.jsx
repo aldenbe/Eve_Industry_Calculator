@@ -1,10 +1,10 @@
 import * as React from 'react'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
-import { login, logout } from '../actions/UserActions'
-import { eveProvider } from '../providers/eve'
+import { login, logout } from 'actions/UserActions'
+import { eveProvider } from 'providers/eve'
 import RSA from 'react-simple-auth'
-import { API_ROOT } from '../api-config';
+import { API_ROOT } from 'APIConfig';
 
 
 var fetch = require('fetch-retry');

@@ -1,4 +1,4 @@
-import { API_ROOT } from '../api-config';
+import { API_ROOT } from 'APIConfig';
 
 export interface Session {
     accessToken: string,

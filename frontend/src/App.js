@@ -2,10 +2,10 @@ import React, { Component } from 'react';
 import { Redirect, BrowserRouter, NavLink, Route, Switch } from 'react-router-dom';
 import { Container } from 'semantic-ui-react';
 import 'semantic-ui-css/semantic.min.css';
-import Manufacturing from './Manufacturing';
-import About from './About';
-import Reactions from './Reactions';
-import testsso from './testsso';
+import Manufacturing from './containers/production/Manufacturing';
+import About from './containers/About';
+import Reactions from './containers/production/Reactions';
+import testsso from './containers/testsso';
 
 import './App.css';
 class App extends Component {

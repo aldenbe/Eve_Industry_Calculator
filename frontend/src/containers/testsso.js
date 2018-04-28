@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import LoginControl from './character/LoginControl';
+import LoginControl from 'components/character/LoginControl';
 import { connect } from 'react-redux'
 
 class testsso extends React.Component {

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
-import { logout } from '../actions/UserActions'
+import { logout } from 'actions/UserActions'
 
 class CharacterManager extends React.Component {
 
