@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dropdown, Grid, Form, Checkbox, Input, Table } from 'semantic-ui-react';
+import { Dropdown, Grid, Form, Checkbox, Input, Table, Button } from 'semantic-ui-react';
 import './Manufacturing.css';
 import manufacturingConstants from './constants/ManufacturingConstants.json';
 import universe from './constants/Universe.json';
@@ -10,6 +10,7 @@ var fetch = require('fetch-retry');
 var getMinSellValue = require('./utils.js').getMinSellValue;
 var formatNumbersWithCommas = require('./utils.js').formatNumbersWithCommas;
 var formatTime = require('./utils.js').formatTime;
+
 class Manufacturing extends React.Component {
   constructor(props){
     super(props);
@@ -67,7 +68,7 @@ class Manufacturing extends React.Component {
       }
     }).then(response => {
       if (response.ok){
-        return response.json()
+        return response.json();
       }
     }).then(json => {
       for (let i = 0; i < json.length; i++){
@@ -81,6 +82,7 @@ class Manufacturing extends React.Component {
       })
     });
   }
+
   getTypeValues = () => {
     let typeValues = {};
     fetch('https://esi.tech.ccp.is/latest/markets/prices/?datasource=tranquility', {
@@ -168,6 +170,7 @@ class Manufacturing extends React.Component {
       });
     }
   }
+
   getJobGrossCost = () => {
     let jobGrossCost = 0;
     if(this.state.selectedBlueprint.typeID && this.state.costIndices != {} && this.state.typeValues != {}){
@@ -179,6 +182,7 @@ class Manufacturing extends React.Component {
     }
     return jobGrossCost * this.state.runs
   }
+
   getProductPrice = () => {
     getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedBlueprint.productTypeID).then(minSellPrice => {
       this.setState({
@@ -186,12 +190,14 @@ class Manufacturing extends React.Component {
       })
     })
   }
+
   getJobInstallTax = () => {
     let jobGrossCost = this.getJobGrossCost();
     //FIXME: get actual station tax
     let tax = 0.1;
     return jobGrossCost * tax;
   }
+
   getBlueprintMaterials = (selectedBlueprint) => {
     if(selectedBlueprint != null){
       fetch(API_ROOT + 'getblueprintmaterials.php', {
