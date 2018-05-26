@@ -44,6 +44,8 @@ body {
     background-image: url('./images/eve-background.jpg');
     background-repeat: no-repeat;
     background-position: center top;
+    background-attachment: fixed;
+    background-size: 100%;
 }
 
 div.ui.container.eic-container {

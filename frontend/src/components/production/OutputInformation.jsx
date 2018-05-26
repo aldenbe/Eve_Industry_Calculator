@@ -10,14 +10,25 @@ const OutputInformation = (props) => {
   let productSellPrice = props.productSellPrice;
   let jobInstallTax = props.getJobInstallTax();
   let totalProfit = ( (runs * quantityProduced * productSellPrice ) - totalMaterialCost) - (jobGrossCost + jobInstallTax);
-  
-  let rawBuildTime = formatTime(props.rawBuildTime * (1 - (props.timeEfficiency / 50)));
 
-  let totalBuildTime = formatTime((props.rawBuildTime * props.runs) * (1 - (props.timeEfficiency / 50)));
+  let rawBuildTime = formatTime(props.rawBuildTime * (1 - (props.timeEfficiency / 100)));
+
+  let totalBuildTime = formatTime((props.rawBuildTime * props.runs) * (1 - (props.timeEfficiency / 100)));
 
 
   let iskPerHour = totalProfit / (props.runs * (props.rawBuildTime / 3600));
 
+  const formatOutput = (output, displayTrailingDigits) => {
+    if(!isNaN(parseFloat(output)) && isFinite(output)){
+      if(displayTrailingDigits){
+        output = output.toFixed(2);
+      }
+      return formatNumbersWithCommas(output)
+    }
+    else {
+      return output
+    }
+  }
   return (
     <Grid.Column width={4}>
       <Grid columns='equal'>
@@ -52,7 +63,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas((props.productSellPrice).toFixed(2))}
+              value={formatOutput(props.productSellPrice, true)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -64,7 +75,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas(props.quantityProduced * props.runs)}
+              value={formatOutput(props.quantityProduced * props.runs, false)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -76,7 +87,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas(props.getJobGrossCost().toFixed(2))}
+              value={formatOutput(props.getJobGrossCost(), true)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -88,7 +99,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas(props.getJobInstallTax().toFixed(2))}
+              value={formatOutput(props.getJobInstallTax(), true)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -100,7 +111,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas(totalProfit.toFixed(2))}
+              value={formatOutput(totalProfit, true)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -112,7 +123,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatNumbersWithCommas(iskPerHour.toFixed(2))}
+              value={formatOutput(iskPerHour, true)}
               style={{width:'100%'}}
             />
           </Grid.Column>

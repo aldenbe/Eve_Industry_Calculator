@@ -3,9 +3,6 @@ import LoginControl from 'components/character/LoginControl';
 import { connect } from 'react-redux'
 
 class testsso extends React.Component {
-  constructor(props){
-    super(props);
-  }
   myClick = () => {
     console.log(this.props);
   }
@@ -13,13 +10,15 @@ class testsso extends React.Component {
     return (
       <div>
         <LoginControl />
+        <button onClick={this.myClick}>log props</button>
       </div>
     );
   }
 }
 const mapStateToProps = state => {
   return {
-    reduxstate: state
+    user: state.userReducer,
+    universe: state.universeReducer
   }
 }
 

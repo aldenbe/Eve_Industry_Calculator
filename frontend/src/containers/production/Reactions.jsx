@@ -9,6 +9,11 @@ import { MaterialsTable, Totals } from 'components/production/MaterialsTable';
 import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost } from 'utils/production';
 import { formatNumbersWithCommas, formatTime } from 'utils/general';
 import OutputInformation from 'components/production/OutputInformation';
+import LoginControl from 'components/character/LoginControl';
+import { connect } from 'react-redux';
+import { getAccessToken } from 'utils/user';
+import { bindActionCreators } from 'redux';
+import { update_access_token } from 'actions/UserActions';
 
 
 class Reactions extends React.Component {
@@ -17,8 +22,8 @@ class Reactions extends React.Component {
     this.state = {
       costIndices: {},
       typeValues: {},
-      productSellPrice: 0,
       universe: universe,
+      productSellPrice: 0,
       reactionTypes: manufacturingConstants.reactionTypes,
       reactions: [],
       selectidReactionTypeIndex: 0,
@@ -28,24 +33,8 @@ class Reactions extends React.Component {
         productTypeID: null,
         quantity: 0
       },
-      selectedReactionTypeIndex: 0,
       reactionBuildMaterials: [],
       runs: 1,
-      selectedBuyLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
-      selectedSellLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
-      selectedBuildLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
     }
 
   }
@@ -89,7 +78,6 @@ class Reactions extends React.Component {
     for (var i = 0; i < this.state.reactionBuildMaterials.length; i++){
       console.log(this.state.reactionBuildMaterials[i].costPerItem)
       totalCost += (this.state.reactionBuildMaterials[i].quantity * this.state.runs * this.state.reactionBuildMaterials[i].costPerItem);
-      console.log(totalCost);
     }
     return totalCost
   }
@@ -126,8 +114,7 @@ class Reactions extends React.Component {
           response.json().then(reactionResponse => {
             this.setState({
               selectedReaction: reactionResponse,
-            })
-            this.getProductPrice();
+            }, this.getProductPrice)
 
           })
         }
@@ -159,7 +146,7 @@ class Reactions extends React.Component {
   }
 
   getJobGrossCost = () => {
-    return calculateJobGrossCost(this.state.selectedReaction.typeID, this.state.costIndices, this.state.typeValues, this.state.reactionBuildMaterials, this.state.runs, this.state.selectedBuildLocation.selectedSystem, 'reaction')
+    return calculateJobGrossCost(this.state.selectedReaction.typeID, this.state.costIndices, this.state.typeValues, this.state.reactionBuildMaterials, this.state.runs, this.props.universe.selectedBuildLocation.selectedSystem, 'reaction')
   }
 
   getJobInstallTax = () => {
@@ -169,8 +156,13 @@ class Reactions extends React.Component {
     return jobGrossCost * tax;
   }
 
-  getProductPrice = () => {
-    getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedReaction.productTypeID).then(minSellPrice => {
+  getProductPrice = async() => {
+    let regionID = this.props.universe.selectedSellLocation.selectedRegion
+    let systemID = this.props.universe.selectedSellLocation.selectedSystem
+    let structureID = this.props.universe.selectedSellLocation.selectedStructure
+    let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
+    let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
+    getMinSellValue(regionID, systemID, structureID, structureTypeID, this.state.selectedReaction.productTypeID, accessToken).then(minSellPrice => {
       this.setState({
         productSellPrice: minSellPrice
       })
@@ -183,100 +175,45 @@ class Reactions extends React.Component {
     return quantity * this.state.runs
   }
 
-  getMaterialSellValues = (reactionBuildMaterials) => {
-    var promises = [];
+  getMaterialSellValues = async(reactionBuildMaterials) => {
+    let materialValuePromises = [];
     for (let i = 0; i < reactionBuildMaterials.length; i++) {
 
-      var promise = getMinSellValue(this.state.selectedBuyLocation.selectedRegion, this.state.selectedBuyLocation.selectedSystem, this.state.selectedBuyLocation.selectedStation, reactionBuildMaterials[i].materialTypeID).then((minPrice) => {
+      let regionID = this.props.universe.selectedBuyLocation.selectedRegion
+      let systemID = this.props.universe.selectedBuyLocation.selectedSystem
+      let structureID = this.props.universe.selectedBuyLocation.selectedStructure
+      let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
+      let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
+      let promise = getMinSellValue(regionID, systemID, structureID, structureTypeID, reactionBuildMaterials[i].materialTypeID, accessToken).then((minPrice) => {
         reactionBuildMaterials[i].costPerItem = minPrice;
       });
-
-
-      promises.push(promise);
+      materialValuePromises.push(promise);
     }
     //after all prices are fetched update state
-    Promise.all(promises).then((values) => {
-
-      let totalCost = 0.00;
-      let totalVolume = 0.00;
-      for (let i = 0; i < reactionBuildMaterials.length; i++){
-        totalVolume += (reactionBuildMaterials[i].volume * reactionBuildMaterials[i].quantity);
-        totalCost += (reactionBuildMaterials[i].costPerItem * reactionBuildMaterials[i].quantity);
-      }
-      totalCost = totalCost.toFixed(2);
-      totalVolume = totalVolume.toFixed(2);
+    Promise.all(materialValuePromises).then((values) => {
       this.setState({
         reactionBuildMaterials: reactionBuildMaterials,
       })
     });
   }
 
-  onRunsInputChange = (e) => {
+  onInputChange = (e) => {
     let radix = 10;
-    if (parseInt(e.target.value, radix) < parseInt(e.target.min, radix)) {
+    if (parseInt(e.target.value, radix) > parseInt(e.target.max, radix)) {
+      e.target.value = e.target.max;
+    } else if (parseInt(e.target.value, radix) < parseInt(e.target.min, radix)) {
       e.target.value = e.target.min;
     }
     this.setState({
-      runs: e.target.value,
+      [e.target.name]: e.target.value,
     });
   }
 
-  //FIXME: refactor location and universe
-  changeLocationSelection = (locationType, station, system, region) => {
-    let selectedLocation
-    switch(locationType) {
-      case 'buy':
-        selectedLocation = 'selectedBuyLocation';
-        break;
-      case 'sell':
-        selectedLocation = 'selectedSellLocation';
-        break;
-      case 'build':
-        selectedLocation = 'selectedBuildLocation';
-        break;
-    }
-    region = region || this.state[selectedLocation].selectedRegion;
-    system = system || this.state[selectedLocation].selectedSystem;
-    this.setState({
-      [selectedLocation]: {
-        selectedRegion: region,
-        selectedSystem: system,
-        selectedStation: station,
-      }
-    }, () => {
-      if(this.state.selectedReaction.typeID){
-        this.getProductPrice();
-        this.getMaterialSellValues(this.state.reactionBuildMaterials);
-
-      }
-    })
-  }
-
-  updateUniverse = (regionID, solarSystemID, stationsToAdd) => {
-    let universe = this.state.universe;
-    //let stations = this.state.universe[regionID].solarSystems[solarSystemID].stations;
-    if(stationsToAdd.length > 0){
-      for(let i = 0; i < stationsToAdd.length; i++){
-        if(universe[regionID].systems[solarSystemID].stations.length == 0){
-          universe[regionID].systems[solarSystemID].stations = {
-            [stationsToAdd[i].stationID]: {
-              stationName: stationsToAdd[i].name,
-              corporationID: stationsToAdd[i].corporationID
-            }
-          };
-        } else {
-          universe[regionID].systems[solarSystemID].stations[stationsToAdd[i].stationID] = {
-            stationName: stationsToAdd[i].name,
-            corporationID: stationsToAdd[i].corporationID
-          }
-        }
-
-      }
-      this.setState({
-        //universe[regionID].solarSystems[solarSystems].stations: stations
-        universe: universe
-      })
-    }
+  handleLocationChange = () => {
+    if(this.state.selectedReaction.typeID){
+       this.getProductPrice();
+       this.getMaterialSellValues(this.state.reactionBuildMaterials);
+     }
   }
 
   render () {
@@ -284,6 +221,11 @@ class Reactions extends React.Component {
       <div className='reactions-layout'>
         <Grid>
           <Grid.Row>
+            <Grid.Column floated='right'>
+              <LoginControl />
+            </Grid.Column>
+          </Grid.Row>
+          <Grid.Row> {/*First component row*/}
             <BlueprintSelection
               placeholder={'Select Reaction'}
               blueprints={this.state.reactions}
@@ -301,18 +243,19 @@ class Reactions extends React.Component {
                   <Grid.Column width={10}>
                     <Grid>
                       <Grid.Row>
-                        <Grid.Column width={6}>
-                          <p>Runs: </p>
-                        </Grid.Column>
-                        <Grid.Column width={10}>
+                        <Grid.Column>
+                          <label htmlFor='runsInput'>Runs: </label>
                           <Input
-                          style={{width:'100%'}}
+                          style={{width:'70%'}}
+                          id="runsInput"
                           min="1"
                           name="runs"
                           value={this.state.runs}
-                          onChange={this.onRunsInputChange}
+                          onChange={this.onInputChange}
                           />
+
                         </Grid.Column>
+
                       </Grid.Row>
                     </Grid>
                   </Grid.Column>
@@ -339,31 +282,22 @@ class Reactions extends React.Component {
           <Grid.Row>
             Buy:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedBuyLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="buy"
+              locationType="selectedBuyLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
             Sell:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedSellLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="sell"
+              locationType="selectedSellLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
             Build:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedBuildLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="build"
+              locationType="selectedBuildLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
@@ -386,4 +320,17 @@ class Reactions extends React.Component {
   }
 }
 
-export default Reactions;
+const mapStateToProps = state => {
+  return {
+    user: state.userReducer,
+    universe: state.universeReducer
+  }
+}
+
+const mapDispatchToProps = dispatch => {
+  return bindActionCreators({
+    update_access_token
+  }, dispatch)
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(Reactions);

@@ -21,7 +21,7 @@ if($result = $conn->query($locationSelect)){
   //also need to allow thera
   //really rather not have to resort to just using a static solution with no procedural equivalent, but if i have to
   $stationSelect =
-    "SELECT mapRegions.regionID, stationID, corporationID, mapSolarSystems.solarSystemID, stationName, staStations.security, regionName, solarSystemName
+    "SELECT mapRegions.regionID, stationID, corporationID, mapSolarSystems.solarSystemID, stationName, mapSolarSystems.security, regionName, solarSystemName, stationTypeID
     FROM mapRegions
     JOIN mapSolarSystems on mapRegions.regionID = mapSolarSystems.regionID
     LEFT JOIN staStations on staStations.solarSystemID = mapSolarSystems.solarSystemID
@@ -32,14 +32,15 @@ if($result = $conn->query($locationSelect)){
         $locations[$row['regionID']]['regionName'] = $row['regionName'];
       }
       if(!isset($locations[$row['regionID']]['systems'][$row['solarSystemID']])){
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['solarSystemName'] = $row['solarSystemName'];
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['stations'] = array();
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['systemName'] = $row['solarSystemName'];
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['security'] = $row['security'];
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['structures'] = array();
       }
       if(isset($row['stationID'])){
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['stations'][$row['stationID']] = array();
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['stations'][$row['stationID']]['stationName'] = $row['stationName'];
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['stations'][$row['stationID']]['security'] = $row['security'];
-        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['stations'][$row['stationID']]['corporationID'] = $row['corporationID'];
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['structures'][$row['stationID']] = array();
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['structures'][$row['stationID']]['name'] = $row['stationName'];
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['structures'][$row['stationID']]['corporationID'] = $row['corporationID'];
+        $locations[$row['regionID']]['systems'][$row['solarSystemID']]['structures'][$row['stationID']]['typeID'] = $row['stationTypeID'];
       }
 
     }

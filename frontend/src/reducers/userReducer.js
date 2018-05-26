@@ -1,5 +1,5 @@
-import { USER_LOGIN, USER_LOGOUT, } from '../actionTypes/UserActions'
-import RSA from 'react-simple-auth'
+import { USER_LOGIN, USER_LOGOUT, UPDATE_ACCESS_TOKEN } from '../actionTypes/UserActionTypes';
+import RSA from 'react-simple-auth';
 
 const initialState = {isLoggedIn: false};
 
@@ -7,12 +7,11 @@ export const userReducer = (state = initialState, action) => {
   switch(action.type){
     case USER_LOGIN:
       return Object.assign({}, state, {
-        characterId: action.characterID,
+        characterID: action.characterID,
         characterName: action.characterName,
         scopes: action.scopes,
         accessToken: action.accessToken,
         refreshToken: action.refreshToken,
-        expiration: action.expiration,
         portrait64: action.portrait64,
         portrait128: action.portrait128,
         portrait256: action.portrait256,
@@ -25,6 +24,13 @@ export const userReducer = (state = initialState, action) => {
       RSA.invalidateSession();
       return initialState
       break;
+    case UPDATE_ACCESS_TOKEN:
+    return Object.assign({}, state, {
+      accessToken: action.accessToken,
+      expiration: action.expiration
+    })
+
+    break;
     default:
       return state
       break;

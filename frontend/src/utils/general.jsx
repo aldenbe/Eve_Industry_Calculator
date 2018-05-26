@@ -13,7 +13,7 @@ export const formatTime = (seconds) => {
   return (days + ":" + pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2));
 }
 
-const pad = (num, size) => {
+export const pad = (num, size) => {
     var s = num+"";
     while (s.length < size) s = "0" + s;
     return s;

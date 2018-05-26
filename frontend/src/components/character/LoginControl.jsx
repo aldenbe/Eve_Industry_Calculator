@@ -11,7 +11,7 @@ class LoginController extends React.Component {
     let isLoggedIn = this.props.user.isLoggedIn
     const componentToDisplay = isLoggedIn ? (<CharacterManager />) : (<Login />);
      return (
-       <div>
+       <div style={{float: 'right'}}>
          {componentToDisplay}
        </div>
 

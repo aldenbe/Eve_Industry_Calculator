@@ -1,10 +1,11 @@
-import * as React from 'react'
-import { bindActionCreators } from 'redux'
-import { connect } from 'react-redux'
-import { login, logout } from 'actions/UserActions'
-import { eveProvider } from 'providers/eve'
-import RSA from 'react-simple-auth'
-import { API_ROOT } from 'APIConfig';
+import * as React from 'react';
+import { bindActionCreators } from 'redux';
+import { connect } from 'react-redux';
+import { login, logout } from 'actions/UserActions';
+import { eveProvider } from 'providers/eve';
+import RSA from 'react-simple-auth';
+import { Button } from 'semantic-ui-react';
+import { getNewToken } from 'utils/user';
 
 
 var fetch = require('fetch-retry');
@@ -15,30 +16,8 @@ class Login extends React.Component {
       this.getCharacterDetailsAndLogin(session)
     }
   }
-  getNewToken = async(session) => {
-    let json;
-    let response = await fetch(API_ROOT + 'auth.php', {
-      retryOn: [500, 502],
-      retryDelay: 250,
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "refreshToken": session.refresh_token
-      }),
 
-    });
-    if (response.ok) {
-      json = await response.json();
-      session = this.updateSession(json);
-    }
-    return session
-  }
-  updateSession = (session) => {
-    window.localStorage.setItem('session', JSON.stringify(session));
-    return session
-  }
+
 
   getCharacterDetailsAndLogin = async(session, retrys = 0) => {
     try{
@@ -50,7 +29,7 @@ class Login extends React.Component {
         console.log(error)
         //in weird cases let's just make sure the app doesn't recursively try to get a new access token and login forever.
         if(retrys < 3){
-          session = await this.getNewToken(session);
+          session = await getNewToken(session.refresh_token);
           retrys++;
           this.getCharacterDetailsAndLogin(session, retrys);
         } else {
@@ -107,12 +86,7 @@ class Login extends React.Component {
   render() {
       return (
         <div className="login">
-          <div className="login-providers">
-            <h4>Login:</h4>
-            <button type="button" className="login-button" onClick={() => this.onClickLogin()}>
-                <img src="./images/eve-sso-login-black-large.png" alt="Login with Microsoft" />
-            </button>
-        </div>
+          <input type="image" className="login-button" onClick={this.onClickLogin} src="./images/eve-sso-login-black-small.png" />
       </div>
     )
   }
