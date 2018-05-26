@@ -10,6 +10,11 @@ import BlueprintSelection from 'components/production/BlueprintSelection';
 import OutputInformation from 'components/production/OutputInformation';
 import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost } from 'utils/production';
 import { formatNumbersWithCommas, formatTime } from 'utils/general';
+import LoginControl from 'components/character/LoginControl';
+import { connect } from 'react-redux';
+import { getAccessToken } from 'utils/user';
+import { bindActionCreators } from 'redux';
+import { update_access_token } from 'actions/UserActions';
 
 var fetch = require('fetch-retry');
 
@@ -23,6 +28,7 @@ class Manufacturing extends React.Component {
       productSellPrice: 0,
       blueprintTypes: manufacturingConstants.blueprintTypes,
       blueprints: [],
+      selectedBlueprintTypeIndex: 0,
       selectedBlueprint: {
         typeID: null,
         rawBuildTime: 0,
@@ -30,27 +36,11 @@ class Manufacturing extends React.Component {
         quantity: 0,
         maxProductionLimit: 0
       },
-      selectedBlueprintTypeIndex: 0,
       blueprintBuildMaterials: [],
       regionID: '10000002',
       runs: 0,
       materialEfficiency: 0,
       timeEfficiency: 0,
-      selectedBuyLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
-      selectedSellLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
-      selectedBuildLocation: {
-        selectedRegion: "10000002",
-        selectedSystem: "30000142",
-        selectedStation: "60003760",
-      },
     }
 
   }
@@ -128,18 +118,25 @@ class Manufacturing extends React.Component {
   }
 
   getJobGrossCost = () => {
-    return calculateJobGrossCost(this.state.selectedBlueprint.typeID, this.state.costIndices, this.state.typeValues, this.state.blueprintBuildMaterials, this.state.runs, this.state.selectedBuildLocation.selectedSystem, 'manufacturing')
+    return calculateJobGrossCost(this.state.selectedBlueprint.typeID, this.state.costIndices, this.state.typeValues, this.state.blueprintBuildMaterials, this.state.runs, this.props.universe.selectedBuildLocation.selectedSystem, 'manufacturing')
   }
 
   getJobInstallTax = () => {
     let jobGrossCost = this.getJobGrossCost();
     //FIXME: get actual station tax
+    //ccp has semi officially stated that they won't bother making an endpoint to get actual station tax as stations with settable taxes will be removed in June 2018 anyway
+    //npc station tax is flat 10%
     let tax = 0.1;
     return jobGrossCost * tax;
   }
 
-  getProductPrice = () => {
-    getMinSellValue(this.state.selectedSellLocation.selectedRegion, this.state.selectedSellLocation.selectedSystem, this.state.selectedSellLocation.selectedStation, this.state.selectedBlueprint.productTypeID).then(minSellPrice => {
+  getProductPrice = async() => {
+    let regionID = this.props.universe.selectedSellLocation.selectedRegion
+    let systemID = this.props.universe.selectedSellLocation.selectedSystem
+    let structureID = this.props.universe.selectedSellLocation.selectedStructure
+    let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
+    let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
+    getMinSellValue(regionID, systemID, structureID, structureTypeID, this.state.selectedBlueprint.productTypeID, accessToken).then(minSellPrice => {
       this.setState({
         productSellPrice: minSellPrice
       })
@@ -196,15 +193,17 @@ class Manufacturing extends React.Component {
     return totalCost
   }
 
-  getMaterialSellValues = (blueprintBuildMaterials) => {
+  getMaterialSellValues = async(blueprintBuildMaterials) => {
     let materialValuePromises = [];
     for (let i = 0; i < blueprintBuildMaterials.length; i++) {
-
-      let promise = getMinSellValue(this.state.selectedBuyLocation.selectedRegion, this.state.selectedBuyLocation.selectedSystem, this.state.selectedBuyLocation.selectedStation, blueprintBuildMaterials[i].materialTypeID).then((minPrice) => {
+      let regionID = this.props.universe.selectedBuyLocation.selectedRegion
+      let systemID = this.props.universe.selectedBuyLocation.selectedSystem
+      let structureID = this.props.universe.selectedBuyLocation.selectedStructure
+      let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
+      let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
+      let promise = getMinSellValue(regionID, systemID, structureID, structureTypeID, blueprintBuildMaterials[i].materialTypeID, accessToken).then((minPrice) => {
         blueprintBuildMaterials[i].costPerItem = minPrice;
       });
-
-
       materialValuePromises.push(promise);
     }
     //after all prices are fetched update state
@@ -228,68 +227,22 @@ class Manufacturing extends React.Component {
     });
   }
 
-  //FIXME: refactor location and universe
-  changeLocationSelection = (locationType, station, system, region) => {
-    let selectedLocation
-    switch(locationType) {
-      case 'buy':
-        selectedLocation = 'selectedBuyLocation';
-        break;
-      case 'sell':
-        selectedLocation = 'selectedSellLocation';
-        break;
-      case 'build':
-        selectedLocation = 'selectedBuildLocation';
-        break;
-    }
-    region = region || this.state[selectedLocation].selectedRegion;
-    system = system || this.state[selectedLocation].selectedSystem;
-    this.setState({
-      [selectedLocation]: {
-        selectedRegion: region,
-        selectedSystem: system,
-        selectedStation: station,
-      }
-    }, () => {
-      if(this.state.selectedBlueprint.typeID){
-        this.getProductPrice();
-        this.getMaterialSellValues(this.state.blueprintBuildMaterials);
-
-      }
-    })
-  }
-
-  updateUniverse = (regionID, solarSystemID, stationsToAdd) => {
-    let universe = this.state.universe;
-    //let stations = this.state.universe[regionID].solarSystems[solarSystemID].stations;
-    if(stationsToAdd.length > 0){
-      for(let i = 0; i < stationsToAdd.length; i++){
-        if(universe[regionID].systems[solarSystemID].stations.length == 0){
-          universe[regionID].systems[solarSystemID].stations = {
-            [stationsToAdd[i].stationID]: {
-              stationName: stationsToAdd[i].name,
-              corporationID: stationsToAdd[i].corporationID
-            }
-          };
-        } else {
-          universe[regionID].systems[solarSystemID].stations[stationsToAdd[i].stationID] = {
-            stationName: stationsToAdd[i].name,
-            corporationID: stationsToAdd[i].corporationID
-          }
-        }
-
-      }
-      this.setState({
-        //universe[regionID].solarSystems[solarSystems].stations: stations
-        universe: universe
-      })
-    }
+  handleLocationChange = () => {
+    if(this.state.selectedBlueprint.typeID){
+       this.getProductPrice();
+       this.getMaterialSellValues(this.state.blueprintBuildMaterials);
+     }
   }
 
   render() {
     return (
       <div className="manufacturing-layout">
         <Grid>
+          <Grid.Row>
+            <Grid.Column floated='right'>
+              <LoginControl />
+            </Grid.Column>
+          </Grid.Row>
           <Grid.Row> {/*First component row*/}
             <BlueprintSelection
               placeholder={'Select Blueprint'}
@@ -343,7 +296,7 @@ class Manufacturing extends React.Component {
                             id="teInput"
                             min="0"
                             name="timeEfficiency"
-                            max="10"
+                            max="20"
                             value={this.state.timeEfficiency}
                             onChange={this.onInputChange}
                             />
@@ -376,31 +329,22 @@ class Manufacturing extends React.Component {
           <Grid.Row>
             Buy:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedBuyLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="buy"
+              locationType="selectedBuyLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
             Sell:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedSellLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="sell"
+              locationType="selectedSellLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
             Build:
             <LocationSelection
-              changeLocationSelection={this.changeLocationSelection}
-              selectedLocation={this.state.selectedBuildLocation}
-              universe={this.state.universe}
-              updateUniverse={this.updateUniverse}
-              locationType="build"
+              locationType="selectedBuildLocation"
+              triggerParentUpdate={this.handleLocationChange}
             />
           </Grid.Row>
           <Grid.Row>
@@ -424,4 +368,17 @@ class Manufacturing extends React.Component {
   }
 }
 
-export default Manufacturing
+const mapStateToProps = state => {
+  return {
+    user: state.userReducer,
+    universe: state.universeReducer
+  }
+}
+
+const mapDispatchToProps = dispatch => {
+  return bindActionCreators({
+    update_access_token
+  }, dispatch)
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(Manufacturing);

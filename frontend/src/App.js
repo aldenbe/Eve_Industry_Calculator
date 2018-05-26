@@ -33,8 +33,6 @@ class App extends Component {
               <Route path="/Manufacturing" component={Manufacturing} />
               <Route path="/Reactions" component={Reactions} />
               <Route path="/About" component={About} />
-              <Route path="/testsso" component={testsso} />
-
             </Switch>
           </Container>
         </div>

@@ -1,88 +1,124 @@
 import React from 'react';
 import { Dropdown, Grid } from 'semantic-ui-react';
 import { API_ROOT } from 'APIConfig';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
+import { update_structures, update_selected_location } from 'actions/UniverseActions';
+import { update_access_token } from 'actions/UserActions';
+import { getAccessToken } from 'utils/user';
 
 var fetch = require('fetch-retry');
 
-//FIXME: something has gone horribly wrong and I hate this implementation
-//Everything about this feels wrong and terrible and like i am horribly abusing react
-//I hope somebody can fix this unholy mess
+//FIXME: Even after significantly more effort expended designing this simple component than most other components and multiple refactorings I still hate this.
+//I don't know why I think this component is particularly terrible and poorly designed anymore, but if anybody would like to fix it I'd appreciate it.
+
 class LocationSelection extends React.Component {
   constructor(props){
     super(props);
     this.state = {
-      regions: [],
-      solarSystems: [],
-      stations: [],
-
+      structureArray: []
     }
-    this.createDropdownArrays();
   }
-  /* Nice to have a procedural method, but this data is in sde and faster to import from a json file
-  getRegions = () => {
-    fetch(API_ROOT + 'getlocations.php', {
+  componentDidMount() {
+    this.getStructureArray(this.props.universe[this.props.locationType].selectedRegion, this.props.universe[this.props.locationType].selectedSystem)
+  }
+
+  getStationsInSystem = async(regionID, systemID) => {
+    let stations = [];
+    let stationDetailsPromises = [];
+    let stationObject = {};
+
+    let systemResponse = await fetch('https://esi.tech.ccp.is/latest/universe/systems/' + systemID + '/?datasource=tranquility&language=en-us', {
       retryOn: [500, 502],
       retryDelay: 250,
-      method: 'POST',
+      method: 'GET',
       headers: {
         "Content-Type": "application/json"
-      },
-    }).then(response => {
-      if (response.ok) {
-        response.json().then(json => {
-          console.log(json);
-          console.log(Object.keys(json).length); //should be 65 once everything is correct
-          for(let key in json){
-            console.log(json[key].regionName);
-          }
-          let regions = [];
-          let solarSystems = [];
-          let stations = [];
-          for (let key in json) {
-            regions.push({
-              key: key,
-              value: key,
-              text: json[key].regionName
-            })
-          }
-          for (let key in json[this.props.selectedLocation.selectedRegion].systems){
-            solarSystems.push({
-              key: key,
-              value: key,
-              text: json[this.props.selectedLocation.selectedRegion].systems[key].solarSystemName
-            })
-          }
-          for (let key in json[this.props.selectedLocation.selectedRegion].systems[this.props.selectedLocation.selectedSystem].stations){
-            stations.push({
-              key: key,
-              value: key,
-              text: json[this.props.selectedLocation.selectedRegion].systems[this.props.selectedLocation.selectedSystem].stations[key].stationName
-            })
-          }
-          this.setState({
-            universe: json,
-            regions: regions,
-            solarSystems: solarSystems,
-            stations: stations
-          });
-        })
       }
     });
-
-  }*/
-
-  createDropdownArrays = () => {
-    let regions = this.createRegionArray();
-    let solarSystems = this.createSolarSystemArray(this.props.selectedLocation.selectedRegion);
-    let stations = this.createStationArray(this.props.selectedLocation.selectedRegion, this.props.selectedLocation.selectedSystem);
-
-    this.state = {
-      regions: regions,
-      solarSystems: solarSystems
+    if (systemResponse.ok){
+      let systemJson = await systemResponse.json();
+      let numStations = 0;
+      if (systemJson.stations) numStations = systemJson.stations.length;
+      for(let i = 0; i < numStations; i++){
+        let stationID = systemJson.stations[i];
+        if(!this.props.universe[regionID].systems[systemID].structures[stationID]){
+          let promise = fetch('https://esi.tech.ccp.is/latest/universe/stations/' + stationID + '/?datasource=tranquility', {
+            retryOn: [500, 502],
+            retryDelay: 250,
+            method: 'GET',
+            headers: {
+              "Content-Type": "application/json"
+            }
+          }).then(stationResponse => {
+            if (stationResponse.ok){
+              return stationResponse.json()
+            }
+          }).then(stationJson => {
+            stationObject[stationJson.station_id] = {
+              name: stationJson.name,
+              corporationID: stationJson.owner,
+              typeID: stationJson.type_id
+            }
+          })
+          stationDetailsPromises.push(promise);
+        }
+      }
+      await Promise.all(stationDetailsPromises)
+      return stationObject
     }
   }
 
-  createRegionArray = () => {
+  getCitadelsInSystem = async(regionID, systemID) => {
+    let citadelObject = {};
+    let citadelDetailsPromises = [];
+
+    //check that there are at least 10 seconds before access token expires or get new token
+    let accessToken = await getAccessToken(this.props.user, this.props.update_access_token)
+
+
+    let systemName = this.props.universe[regionID].systems[systemID].systemName;
+    let searchResponse = await fetch('https://esi.tech.ccp.is/latest/characters/' + this.props.user.characterID + '/search/?categories=structure&search=' + systemName, {
+      retryOn: [500, 502],
+      retryDelay: 250,
+      method: 'GET',
+      headers: {
+        "Authorization": 'Bearer ' + accessToken
+      }
+    })
+    if(searchResponse.ok){
+      let searchJson = await searchResponse.json();
+      let citadelIDs = searchJson.structure || [];
+      for(let i = 0; i < citadelIDs.length; i++){
+        let citadelID = citadelIDs[i];
+        if(!this.props.universe[regionID].systems[systemID].structures[citadelID]){
+          let promise = fetch('https://esi.tech.ccp.is/latest/universe/structures/' + citadelID + '/?datasource=tranquility', {
+            retryOn: [500, 502],
+            retryDelay: 250,
+            method: 'GET',
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": 'Bearer ' + this.props.user.accessToken
+            }
+          }).then(citadelResponse => {
+            if (citadelResponse.ok){
+              return citadelResponse.json()
+            }
+          }).then(citadelJson => {
+            citadelObject[citadelID] = {
+              name: citadelJson.name,
+              typeID:citadelJson.type_id
+            };
+          })
+          citadelDetailsPromises.push(promise);
+        }
+      }
+      await Promise.all(citadelDetailsPromises)
+      return citadelObject
+    }
+  }
+
+  getRegionArray = () => {
     let regions = [];
     for (let regionID in this.props.universe) {
       regions.push({
@@ -94,113 +130,85 @@ class LocationSelection extends React.Component {
     return regions;
   }
 
-  createSolarSystemArray = (regionID) => {
-    let solarSystems = [];
-    for (let solarSystemID in this.props.universe[regionID].systems){
-      solarSystems.push({
-        value: solarSystemID,
-        text: this.props.universe[regionID].systems[solarSystemID].solarSystemName
+  getSystemArray = (regionID) => {
+    let systems = [];
+    for (let systemID in this.props.universe[regionID].systems){
+      systems.push({
+        value: systemID,
+        text: this.props.universe[regionID].systems[systemID].systemName
       })
     }
-    return solarSystems;
+    return systems;
   }
 
-  createStationArray = (regionID, solarSystemID) => {
-    let stations = [];
-    let stationsToAdd = [];
-    let stationDetailsPromises = [];
-
-    fetch('https://esi.tech.ccp.is/latest/universe/systems/' + solarSystemID + '/?datasource=tranquility&language=en-us', {
-      retryOn: [500, 502],
-      retryDelay: 250,
-      method: 'GET',
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }).then(response => {
-      if (response.ok){
-        return response.json()
-      }
-    }).then(json => {
-      let numStations = 0;
-      if (json.stations) numStations = json.stations.length;
-      for(let i = 0; i < numStations; i++){
-        let stationID = json.stations[i];
-        if(!this.props.universe[regionID].systems[solarSystemID].stations[stationID]){
-          let promise = fetch('https://esi.tech.ccp.is/latest/universe/stations/' + stationID + '/?datasource=tranquility', {
-            retryOn: [500, 502],
-            retryDelay: 250,
-            method: 'GET',
-            headers: {
-              "Content-Type": "application/json"
-            }
-          }).then(response => {
-            if (response.ok){
-              return response.json()
-            }
-          }).then(json => {
-            stationsToAdd.push({
-              stationID: json.station_id,
-              name: json.name,
-              corporationID: json.owner
-            })
-          })
-          stationDetailsPromises.push(promise);
-        }
-
-      }
-    }).then( () => {
-      Promise.all(stationDetailsPromises).then(() => {
-        this.props.updateUniverse(regionID, solarSystemID, stationsToAdd);
-        for (let stationID in this.props.universe[regionID].systems[solarSystemID].stations) {
-          stations.push({
-            value: stationID,
-            text: this.props.universe[regionID].systems[solarSystemID].stations[stationID].stationName,
-          })
-          if(this.props.selectedLocation.selectedStation === "" && stations.length) this.props.changeLocationSelection(this.props.locationType, stations[0].value);
-        }
-        this.setState({
-          stations: stations
+  getStructureArray = async(regionID, systemID) => {
+    let structures = [];
+    let stationObject = await this.getStationsInSystem(regionID, systemID)
+    let citadelObject = {};
+    if(this.props.user.isLoggedIn){
+      citadelObject = await this.getCitadelsInSystem(regionID, systemID)
+    }
+    let structureObject = await Object.assign(stationObject, citadelObject)
+    //console.log(structureObject)
+    await this.props.update_structures(structureObject, systemID, regionID)
+    if(Object.keys(this.props.universe[regionID].systems[systemID].structures).length){
+      for (let structureID in this.props.universe[regionID].systems[systemID].structures) {
+        structures.push({
+          key: this.props.locationType + structureID,
+          value: structureID,
+          text: this.props.universe[regionID].systems[systemID].structures[structureID].name,
         })
-      })
+      }
+    }
+    this.setState({
+      structureArray: structures
     })
-
+    return structures
   }
 
-  handleChangeRegion = (e, { value }) => {
+  handleChangeRegion = async(e, { value }) => {
     let regionID = value;
-    if(this.props.selectedLocation.selectedRegion !== regionID){
-      let solarSystems = this.createSolarSystemArray(regionID);
-      this.setState({
-        solarSystems: solarSystems,
-      })
-      let stations = this.createStationArray(regionID, solarSystems[0].value);
+    if(this.props.universe[this.props.locationType].selectedRegion !== regionID){
 
+      let systemID = "";
+      let structureID = "";
+      let systems = this.getSystemArray(regionID);
+      if (systems.length){
+        systemID = systems[0].value;
+        let structures = await this.getStructureArray(regionID, systemID)
+        if (structures.length){
+          structureID = structures[0].value;
+        }
 
-      let solarSystemID = "";
-      if (solarSystems[0]) solarSystemID = solarSystems[0].value;
-      let stationID = "";
-      if (stations) stationID = stations[0].value;
-      this.props.changeLocationSelection(this.props.locationType, stationID, solarSystemID, value);
+      }
+
+      //if (stations) stationID = stations[0].value;
+      await this.props.update_selected_location(this.props.locationType, structureID, systemID, regionID);
+      this.props.triggerParentUpdate();
     }
 
   }
 
-  handleChangeSystem = (e, { value }) => {
-    let solarSystemID = value;
-    if(this.props.selectedLocation.selectedSystem !== solarSystemID){
-      let stations = this.createStationArray(this.props.selectedLocation.selectedRegion, solarSystemID);
+  handleChangeSystem = async(e, { value }) => {
 
-      let stationID = "";
-      if (stations) stationID = stations[0].value;
-      this.props.changeLocationSelection(this.props.locationType, stationID, solarSystemID);
+    let systemID = value;
+    if(this.props.universe[this.props.locationType].selectedSystem !== systemID){
+
+      let structureID = "";
+      let structures = await this.getStructureArray(this.props.universe[this.props.locationType].selectedRegion, systemID)
+      if (structures.length){
+        structureID = structures[0].value;
+      }
+      await this.props.update_selected_location(this.props.locationType, structureID, systemID);
+      this.props.triggerParentUpdate();
     }
   }
 
-  handleChangeStation = (e, { value }) => {
-    let stationID = value;
-    if(this.props.selectedLocation.selectedStation !== stationID)
-      this.props.changeLocationSelection(this.props.locationType, stationID);
+  handleChangeStructure = async(e, { value }) => {
+    let structureID = value;
+    if(this.props.universe[this.props.locationType].selectedStructure !== structureID)
+      await this.props.update_selected_location(this.props.locationType, structureID);
+      this.props.triggerParentUpdate();
   }
 
   render() {
@@ -209,26 +217,42 @@ class LocationSelection extends React.Component {
         <Dropdown
           search
           selection
-          options={this.state.regions}
+          options={this.getRegionArray()}
           onChange={this.handleChangeRegion}
-          value={this.props.selectedLocation.selectedRegion}
+          value={this.props.universe[this.props.locationType].selectedRegion}
         />
         <Dropdown
           search
           selection
-          options={this.state.solarSystems}
+          options={this.getSystemArray(this.props.universe[this.props.locationType].selectedRegion)}
           onChange={this.handleChangeSystem}
-          value={this.props.selectedLocation.selectedSystem}
+          value={this.props.universe[this.props.locationType].selectedSystem}
         />
         <Dropdown
           search
           selection
-          options={this.state.stations}
-          onChange={this.handleChangeStation}
-          value={this.props.selectedLocation.selectedStation}
+          options={this.state.structureArray}
+          onChange={this.handleChangeStructure}
+          value={this.props.universe[this.props.locationType].selectedStructure}
         />
       </Grid.Column>
     )
   }
 }
-export default LocationSelection
+
+const mapStateToProps = state => {
+  return {
+    user: state.userReducer,
+    universe: state.universeReducer
+  }
+}
+
+const mapDispatchToProps = dispatch => {
+  return bindActionCreators({
+    update_structures,
+    update_selected_location,
+    update_access_token
+  }, dispatch)
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(LocationSelection);

@@ -20,12 +20,12 @@ export const MaterialsTable = (props) => {
       <Table.Body>
         {props.blueprintBuildMaterials.map((material, index) => (
           <Table.Row key={index}>
-            <Table.Cell key={index}>{material.typeName}</Table.Cell>
-            <Table.Cell key={index}>{formatNumbersWithCommas(props.getMaterialQuantityAfterME(index))}</Table.Cell>
-            <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.volume).toFixed(2))}</Table.Cell>
-            <Table.Cell key={index}>{formatNumbersWithCommas((material.volume * props.runs * props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
-            <Table.Cell key={index}>{formatNumbersWithCommas(parseFloat(material.costPerItem).toFixed(2))}</Table.Cell>
-            <Table.Cell key={index}>{formatNumbersWithCommas((material.costPerItem * props.runs * props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
+            <Table.Cell key={'material'+index}>{material.typeName}</Table.Cell>
+            <Table.Cell key={'quantity'+index}>{formatNumbersWithCommas(props.getMaterialQuantityAfterME(index))}</Table.Cell>
+            <Table.Cell key={'volume'+index}>{formatNumbersWithCommas(parseFloat(material.volume).toFixed(2))}</Table.Cell>
+            <Table.Cell key={'totalvolume'+index}>{formatNumbersWithCommas((material.volume * props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
+            <Table.Cell key={'cost'+index}>{formatNumbersWithCommas(parseFloat(material.costPerItem).toFixed(2))}</Table.Cell>
+            <Table.Cell key={'totalcost'+index}>{formatNumbersWithCommas((material.costPerItem * props.getMaterialQuantityAfterME(index)).toFixed(2))}</Table.Cell>
 
           </Table.Row>
         ))}

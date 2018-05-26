@@ -41,9 +41,11 @@ body {
     color: #d3d3d3;
     font-family: Verdana, Geneva, sans-serif;
     background-color: black;
-    background-image: url('./images/eve-background.png');
+    background-image: url('./images/eve-background.jpg');
     background-repeat: no-repeat;
     background-position: center top;
+    background-attachment: fixed;
+    background-size: 100%;
 }
 
 div.ui.container.eic-container {
