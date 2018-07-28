@@ -6,7 +6,7 @@ import BlueprintSelection from 'components/production/BlueprintSelection';
 import manufacturingConstants from 'constants/ManufacturingConstants.json';
 import universe from 'constants/Universe.json';
 import { MaterialsTable, Totals } from 'components/production/MaterialsTable';
-import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost } from 'utils/production';
+import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost, getPriceFromReduxStore } from 'utils/production';
 import { formatNumbersWithCommas, formatTime } from 'utils/general';
 import OutputInformation from 'components/production/OutputInformation';
 import LoginControl from 'components/character/LoginControl';
@@ -14,6 +14,7 @@ import { connect } from 'react-redux';
 import { getAccessToken } from 'utils/user';
 import { bindActionCreators } from 'redux';
 import { update_access_token } from 'actions/UserActions';
+import { update_item_price } from 'actions/MarketActions';
 
 
 class Reactions extends React.Component {
@@ -75,11 +76,17 @@ class Reactions extends React.Component {
 
   getTotalMaterialCost = () => {
     let totalCost = 0;
+    let selectedStructure = this.props.universe.selectedBuyLocation.selectedStructure;
     for (var i = 0; i < this.state.reactionBuildMaterials.length; i++){
-      console.log(this.state.reactionBuildMaterials[i].costPerItem)
-      totalCost += (this.state.reactionBuildMaterials[i].quantity * this.state.runs * this.state.reactionBuildMaterials[i].costPerItem);
+      let materialTypeID = this.state.reactionBuildMaterials[i].materialTypeID;
+      totalCost += (this.state.reactionBuildMaterials[i].quantity * this.state.runs * this.props.market[selectedStructure][materialTypeID]);
     }
     return totalCost
+  }
+
+  getTotalBuildTime = () => {
+    let totalBuildTime = this.state.selectedReaction.rawProductionTime * this.state.runs;
+    return totalBuildTime
   }
 
   handleReactionSelection = (e, {value}) => {
@@ -138,7 +145,6 @@ class Reactions extends React.Component {
           response.json().then(materialArray => {
             this.getMaterialSellValues(materialArray);
             //console.log(blueprintBuildMaterials);
-
           })
         }
       });
@@ -152,6 +158,8 @@ class Reactions extends React.Component {
   getJobInstallTax = () => {
     let jobGrossCost = this.getJobGrossCost();
     //FIXME: get actual station tax
+    //stations no longer of settable taxes
+    //return .1 for station, check for citadel and fetch/return proper tax
     let tax = 0.1;
     return jobGrossCost * tax;
   }
@@ -162,7 +170,7 @@ class Reactions extends React.Component {
     let structureID = this.props.universe.selectedSellLocation.selectedStructure
     let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
     let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
-    getMinSellValue(regionID, systemID, structureID, structureTypeID, this.state.selectedReaction.productTypeID, accessToken).then(minSellPrice => {
+    getMinSellValue(this.props.market, regionID, systemID, structureID, structureTypeID, this.state.selectedReaction.productTypeID, accessToken, this.props.update_item_price).then(minSellPrice => {
       this.setState({
         productSellPrice: minSellPrice
       })
@@ -184,7 +192,7 @@ class Reactions extends React.Component {
       let structureID = this.props.universe.selectedBuyLocation.selectedStructure
       let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
       let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
-      let promise = getMinSellValue(regionID, systemID, structureID, structureTypeID, reactionBuildMaterials[i].materialTypeID, accessToken).then((minPrice) => {
+      let promise = getMinSellValue(this.props.market, regionID, systemID, structureID, structureTypeID, reactionBuildMaterials[i].materialTypeID, accessToken, this.props.update_item_price).then((minPrice) => {
         reactionBuildMaterials[i].costPerItem = minPrice;
       });
       materialValuePromises.push(promise);
@@ -267,14 +275,15 @@ class Reactions extends React.Component {
             <Grid.Column width={4}>
 
               <OutputInformation
-                productSellPrice={this.state.productSellPrice}
+                productSellPrice={getPriceFromReduxStore(this.props.market, this.props.universe.selectedSellLocation.selectedStructure, this.state.selectedReaction.productTypeID)}
                 runs={this.state.runs}
                 quantityProduced={this.state.selectedReaction.quantity}
-                getTotalMaterialCost={this.getTotalMaterialCost}
+                totalMaterialCost={this.getTotalMaterialCost()}
                 rawBuildTime={this.state.selectedReaction.rawProductionTime}
+                totalBuildTime={this.getTotalBuildTime()}
                 materialEfficiency={0}
                 timeEfficiency={0}
-                getJobGrossCost={this.getJobGrossCost}
+                jobGrossCost={this.getJobGrossCost()}
                 getJobInstallTax={this.getJobInstallTax}
               />
             </Grid.Column>
@@ -306,6 +315,8 @@ class Reactions extends React.Component {
                 getMaterialQuantityAfterME={this.getMaterialQuantityAfterME}
                 blueprintBuildMaterials={this.state.reactionBuildMaterials}
                 runs={this.state.runs}
+                market={this.props.market}
+                selectedStructure={this.props.universe.selectedBuyLocation.selectedStructure}
               />
             </Grid.Column>
           </Grid.Row>
@@ -323,13 +334,15 @@ class Reactions extends React.Component {
 const mapStateToProps = state => {
   return {
     user: state.userReducer,
-    universe: state.universeReducer
+    universe: state.universeReducer,
+    market: state.marketReducer
   }
 }
 
 const mapDispatchToProps = dispatch => {
   return bindActionCreators({
-    update_access_token
+    update_access_token,
+    update_item_price
   }, dispatch)
 }
 

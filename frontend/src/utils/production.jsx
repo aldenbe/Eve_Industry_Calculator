@@ -1,13 +1,18 @@
 var fetch = require('fetch-retry');
 
 
-//FIXME pull this info from db at some point
+//FIXME: this information should probably be in constants and updated with sde pushes.
 const stationTypeIDs = [54, 56, 57, 58, 59, 1529, 1530, 1531, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 2071, 2496, 2497, 2498, 2499, 2500, 2501, 2502, 3864, 3865, 3866, 3867, 3868, 3869, 3870, 3871, 3872, 4023, 4024, 9856, 9857, 9867, 9868, 9873, 10795, 12242, 12294, 12295, 19757, 21642, 21644, 21645, 21646, 22296, 22297, 22298, 29323, 29387, 29388, 29389, 29390, 34325, 34326];
 const structureTypeIDs = [35825, 35826, 35827, 35828, 35829, 35830, 35835, 35836, 35838, 35839, 37533, 35837, 35840, 35841, 37534, 35842, 35843, 35844, 35845, 37535, 37536, 35832, 35833, 35834, 40340, 47512, 47513, 47514, 47515, 47516, 45006, 46363, 46364];
 
-//FIXME: handle multiple pages
-export const getMinSellValue = async(regionID, systemID, structureID, structureTypeID, typeID, accessToken) => {
-  let minPrice = 'N/A';
+//getMinSellValue returns min the min sell value or 'N/A' because of original design and minimal performance impact. This returned value should not be stored
+//to access the value retrieved from getMinSellValue use the redux store addressible as market[structureID][typeID]
+export const getMinSellValue = async(market, regionID, systemID, structureID, structureTypeID, typeID, accessToken, update_item_price) => {
+  let minPrice = getPriceFromReduxStore(market, structureID, typeID);
+  //don't make esi requests if item price at requested location is stored in state
+  if (minPrice !== 'N/A'){
+    return minPrice;
+  }
   let numPages;
   //if structure is station
   if (stationTypeIDs.indexOf(parseInt(structureTypeID)) != -1){
@@ -71,7 +76,7 @@ export const getMinSellValue = async(regionID, systemID, structureID, structureT
         }
 
       }
-
+      update_item_price(typeID, structureID, minPrice);
       return minPrice;
     });
   }
@@ -129,6 +134,7 @@ export const getMinSellValue = async(regionID, systemID, structureID, structureT
           }
         }
       }
+      update_item_price(typeID, structureID, minPrice)
       return minPrice
     })
   }
@@ -198,4 +204,13 @@ export const getCostIndices = (caller) => {
       jobGrossCost = costIndices[selectedSystem].costIndices[activity] * totalExpectedValue;
     }
     return jobGrossCost * runs
+  }
+
+  export const getPriceFromReduxStore = (market, structureID, typeID) => {
+    if(market[structureID] !== undefined && market[structureID][typeID] !== undefined){
+      return market[structureID][typeID];
+    } else {
+      return "N/A";
+    }
+
   }

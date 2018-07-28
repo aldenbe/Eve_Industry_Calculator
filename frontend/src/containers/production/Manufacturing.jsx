@@ -8,13 +8,14 @@ import LocationSelection from 'components/LocationSelection';
 import { MaterialsTable, Totals } from 'components/production/MaterialsTable';
 import BlueprintSelection from 'components/production/BlueprintSelection';
 import OutputInformation from 'components/production/OutputInformation';
-import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost } from 'utils/production';
+import { getMinSellValue, getCostIndices, getTypeValues, calculateJobGrossCost, getPriceFromReduxStore } from 'utils/production';
 import { formatNumbersWithCommas, formatTime } from 'utils/general';
 import LoginControl from 'components/character/LoginControl';
 import { connect } from 'react-redux';
 import { getAccessToken } from 'utils/user';
 import { bindActionCreators } from 'redux';
 import { update_access_token } from 'actions/UserActions';
+import { update_item_price } from 'actions/MarketActions';
 
 var fetch = require('fetch-retry');
 
@@ -24,8 +25,6 @@ class Manufacturing extends React.Component {
     this.state = {
       constIndices: {},
       typeValues: {},
-      universe: universe,
-      productSellPrice: 0,
       blueprintTypes: manufacturingConstants.blueprintTypes,
       blueprints: [],
       selectedBlueprintTypeIndex: 0,
@@ -90,6 +89,7 @@ class Manufacturing extends React.Component {
       }
     });
   }
+
   getBlueprintDetails = (selectedBlueprint) => {
     if(selectedBlueprint != null){
       fetch(API_ROOT + 'getblueprintdetails.php', {
@@ -118,14 +118,20 @@ class Manufacturing extends React.Component {
   }
 
   getJobGrossCost = () => {
-    return calculateJobGrossCost(this.state.selectedBlueprint.typeID, this.state.costIndices, this.state.typeValues, this.state.blueprintBuildMaterials, this.state.runs, this.props.universe.selectedBuildLocation.selectedSystem, 'manufacturing')
+    if(this.state.costIndices !== undefined){
+      return calculateJobGrossCost(this.state.selectedBlueprint.typeID, this.state.costIndices, this.state.typeValues, this.state.blueprintBuildMaterials, this.state.runs, this.props.universe.selectedBuildLocation.selectedSystem, 'manufacturing');
+    }
+    //FIXME: temporary solution to prevent crash if user selects blueprint before this.state.costIndices can fill
+    //not a big enough deal for me to care about compared to other things, but definitely not an acceptable solution.
+    //maybe it doesn't even matter since when costindices updates it will rerender anyway?
+    return 0;
   }
 
   getJobInstallTax = () => {
     let jobGrossCost = this.getJobGrossCost();
     //FIXME: get actual station tax
-    //ccp has semi officially stated that they won't bother making an endpoint to get actual station tax as stations with settable taxes will be removed in June 2018 anyway
-    //npc station tax is flat 10%
+    //stations no longer of settable taxes
+    //return .1 for station, check for citadel and fetch/return proper tax
     let tax = 0.1;
     return jobGrossCost * tax;
   }
@@ -136,11 +142,7 @@ class Manufacturing extends React.Component {
     let structureID = this.props.universe.selectedSellLocation.selectedStructure
     let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
     let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
-    getMinSellValue(regionID, systemID, structureID, structureTypeID, this.state.selectedBlueprint.productTypeID, accessToken).then(minSellPrice => {
-      this.setState({
-        productSellPrice: minSellPrice
-      })
-    })
+    getMinSellValue(this.props.market, regionID, systemID, structureID, structureTypeID, this.state.selectedBlueprint.productTypeID, accessToken, this.props.update_item_price)
   }
 
   getBlueprintMaterials = (selectedBlueprint) => {
@@ -157,13 +159,29 @@ class Manufacturing extends React.Component {
         }),
       }).then(response => {
         if (response.ok) {
-          response.json().then(materialArray => {
-            this.getMaterialSellValues(materialArray);
-            //console.log(blueprintBuildMaterials);
+          response.json().then(blueprintBuildMaterials => {
+            this.getMaterialSellValues(blueprintBuildMaterials);
+            for(let i = 0; i < blueprintBuildMaterials.length; i++){
+              if(blueprintBuildMaterials[i].componentMaterials !== undefined){
+                this.getMaterialSellValues(blueprintBuildMaterials[i].componentMaterials);
+              }
+            }
+            this.setState({
+              blueprintBuildMaterials: blueprintBuildMaterials,
+            })
 
           })
         }
       });
+    }
+  }
+
+  //FIXME: refactor material quantity after me functions together.
+  getComponentMaterialQuantityAfterME = (quantity, runs, materialEfficiency) => {
+    if(quantity === 1){
+      return quantity * runs
+    } else {
+      return Math.ceil(quantity * runs * (1 - materialEfficiency / 100));
     }
   }
 
@@ -172,49 +190,71 @@ class Manufacturing extends React.Component {
     if(quantity === 1){
       return quantity * this.state.runs
     } else {
-      quantity = Math.ceil((quantity) * this.state.runs * (1 - this.state.materialEfficiency / 100));
+      return Math.ceil((quantity) * this.state.runs * (1 - this.state.materialEfficiency / 100));
     }
-    return quantity
   }
 
   getTotalMaterialVolume = () => {
     let totalVolume = 0;
-    for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
-      totalVolume += (this.getMaterialQuantityAfterME(i) * this.state.blueprintBuildMaterials[i].volume);
+    for (let i = 0; i < this.state.blueprintBuildMaterials.length; i++){
+      if(!this.state.blueprintBuildMaterials[i].buildComponent){
+        totalVolume += (this.getMaterialQuantityAfterME(i) * this.state.blueprintBuildMaterials[i].volume);
+      } else {
+        for(let j = 0; j < this.state.blueprintBuildMaterials[i].componentMaterials.length; j++){
+          totalVolume += this.state.blueprintBuildMaterials[i].componentMaterials[j].volume * this.getComponentMaterialQuantityAfterME(this.state.blueprintBuildMaterials[i].componentMaterials[j].quantity, this.state.blueprintBuildMaterials[i].runs, this.state.blueprintBuildMaterials[i].materialEfficiency)
+        }
+      }
     }
     return totalVolume
   }
 
   getTotalMaterialCost = () => {
     let totalCost = 0;
+    let selectedStructure = this.props.universe.selectedBuyLocation.selectedStructure;
     for (var i = 0; i < this.state.blueprintBuildMaterials.length; i++){
-      totalCost += (this.getMaterialQuantityAfterME(i) * this.state.blueprintBuildMaterials[i].costPerItem);
+      if(!this.state.blueprintBuildMaterials[i].buildComponent){
+        let materialTypeID = this.state.blueprintBuildMaterials[i].materialTypeID;
+        if(this.props.market[selectedStructure] !== undefined && this.props.market[selectedStructure][materialTypeID] !== undefined){
+          totalCost += (this.getMaterialQuantityAfterME(i) * this.props.market[selectedStructure][materialTypeID]);
+        } else {
+          return "N/A"
+        }
+      } else {
+        for(let j = 0; j < this.state.blueprintBuildMaterials[i].componentMaterials.length; j++){
+          let materialTypeID = this.state.blueprintBuildMaterials[i].componentMaterials[j].materialTypeID;
+          if(this.props.market[selectedStructure] !== undefined && this.props.market[selectedStructure][materialTypeID] !== undefined){
+            totalCost += this.props.market[selectedStructure][materialTypeID] * this.getComponentMaterialQuantityAfterME(this.state.blueprintBuildMaterials[i].componentMaterials[j].quantity, this.state.blueprintBuildMaterials[i].runs, this.state.blueprintBuildMaterials[i].materialEfficiency);
+          } else {
+            return "N/A"
+          }
+        }
+      }
     }
     return totalCost
   }
 
+  getTotalBuildTime = () => {
+    let totalBuildTime = this.state.selectedBlueprint.rawBuildTime * this.state.runs * (1 - (this.state.timeEfficiency / 100));
+    for (let i = 0; i < this.state.blueprintBuildMaterials.length; i++){
+      if(this.state.blueprintBuildMaterials[i].buildComponent){
+        totalBuildTime += this.state.blueprintBuildMaterials[i].componentDetails.rawBuildTime * this.state.blueprintBuildMaterials[i].runs * (1 - (this.state.blueprintBuildMaterials[i].timeEfficiency / 100));
+      }
+    }
+    return totalBuildTime
+  }
+
   getMaterialSellValues = async(blueprintBuildMaterials) => {
-    let materialValuePromises = [];
     for (let i = 0; i < blueprintBuildMaterials.length; i++) {
       let regionID = this.props.universe.selectedBuyLocation.selectedRegion
       let systemID = this.props.universe.selectedBuyLocation.selectedSystem
       let structureID = this.props.universe.selectedBuyLocation.selectedStructure
       let structureTypeID = this.props.universe[regionID].systems[systemID].structures[structureID].typeID
       let accessToken = await getAccessToken(this.props.user, this.props.update_access_token);
-      let promise = getMinSellValue(regionID, systemID, structureID, structureTypeID, blueprintBuildMaterials[i].materialTypeID, accessToken).then((minPrice) => {
-        blueprintBuildMaterials[i].costPerItem = minPrice;
-      });
-      materialValuePromises.push(promise);
+      let promise = getMinSellValue(this.props.market, regionID, systemID, structureID, structureTypeID, blueprintBuildMaterials[i].materialTypeID, accessToken, this.props.update_item_price)
     }
-    //after all prices are fetched update state
-    Promise.all(materialValuePromises).then(() => {
-
-      this.setState({
-        blueprintBuildMaterials: blueprintBuildMaterials,
-      })
-    });
 
   }
+
   onInputChange = (e) => {
     let radix = 10;
     if (parseInt(e.target.value, radix) > parseInt(e.target.max, radix)) {
@@ -232,6 +272,36 @@ class Manufacturing extends React.Component {
        this.getProductPrice();
        this.getMaterialSellValues(this.state.blueprintBuildMaterials);
      }
+  }
+
+  onComponentInputChange = (blueprintBuildMaterialsIndex, e) => {
+    let blueprintBuildMaterials = this.state.blueprintBuildMaterials.slice();
+    let radix = 10;
+    if (parseInt(e.target.value, radix) > parseInt(e.target.max, radix)) {
+      e.target.value = e.target.max;
+    } else if (parseInt(e.target.value, radix) < parseInt(e.target.min, radix)) {
+      e.target.value = e.target.min;
+    }
+    blueprintBuildMaterials[blueprintBuildMaterialsIndex][e.target.name] = e.target.value;
+    this.setState({
+      blueprintBuildMaterials: blueprintBuildMaterials
+    })
+  }
+
+  setComponentRuns = (blueprintBuildMaterialsIndex, runs) => {
+    let blueprintBuildMaterials = this.state.blueprintBuildMaterials.slice();
+    blueprintBuildMaterials[blueprintBuildMaterialsIndex].runs = runs;
+    this.setState({
+      blueprintBuildMaterials: blueprintBuildMaterials
+    })
+  }
+
+  toggleBuildComponent = (blueprintBuildMaterialsIndex) => {
+    let blueprintBuildMaterials = this.state.blueprintBuildMaterials.slice();
+    blueprintBuildMaterials[blueprintBuildMaterialsIndex].buildComponent = !blueprintBuildMaterials[blueprintBuildMaterialsIndex].buildComponent;
+    this.setState({
+      blueprintBuildMaterials: blueprintBuildMaterials
+    })
   }
 
   render() {
@@ -274,7 +344,6 @@ class Manufacturing extends React.Component {
                           />
 
                         </Grid.Column>
-
                       </Grid.Row>
                       <Grid.Row columns='equal'>
                         <Grid.Column>
@@ -296,7 +365,7 @@ class Manufacturing extends React.Component {
                             id="teInput"
                             min="0"
                             name="timeEfficiency"
-                            max="20"
+                            max="10"
                             value={this.state.timeEfficiency}
                             onChange={this.onInputChange}
                             />
@@ -313,14 +382,15 @@ class Manufacturing extends React.Component {
             </Grid.Column>
             <Grid.Column width={4}>
               <OutputInformation
-                productSellPrice={this.state.productSellPrice}
+                productSellPrice={getPriceFromReduxStore(this.props.market, this.props.universe.selectedSellLocation.selectedStructure, this.state.selectedBlueprint.productTypeID)}
                 runs={this.state.runs}
                 quantityProduced={this.state.selectedBlueprint.quantity}
-                getTotalMaterialCost={this.getTotalMaterialCost}
+                totalMaterialCost={this.getTotalMaterialCost()}
                 rawBuildTime={this.state.selectedBlueprint.rawBuildTime}
+                totalBuildTime={this.getTotalBuildTime()}
                 materialEfficiency={this.state.materialEfficiency}
                 timeEfficiency={this.state.timeEfficiency}
-                getJobGrossCost={this.getJobGrossCost}
+                jobGrossCost={this.getJobGrossCost()}
                 getJobInstallTax={this.getJobInstallTax}
               />
             </Grid.Column>
@@ -350,9 +420,15 @@ class Manufacturing extends React.Component {
           <Grid.Row>
             <Grid.Column>
               <MaterialsTable
+                getComponentMaterialQuantityAfterME={this.getComponentMaterialQuantityAfterME}
                 getMaterialQuantityAfterME={this.getMaterialQuantityAfterME}
                 blueprintBuildMaterials={this.state.blueprintBuildMaterials}
                 runs={this.state.runs}
+                market={this.props.market}
+                selectedStructure={this.props.universe.selectedBuyLocation.selectedStructure}
+                onComponentInputChange={this.onComponentInputChange}
+                setComponentRuns={this.setComponentRuns}
+                toggleBuildComponent={this.toggleBuildComponent}
               />
             </Grid.Column>
 
@@ -371,13 +447,15 @@ class Manufacturing extends React.Component {
 const mapStateToProps = state => {
   return {
     user: state.userReducer,
-    universe: state.universeReducer
+    universe: state.universeReducer,
+    market: state.marketReducer
   }
 }
 
 const mapDispatchToProps = dispatch => {
   return bindActionCreators({
-    update_access_token
+    update_access_token,
+    update_item_price
   }, dispatch)
 }
 

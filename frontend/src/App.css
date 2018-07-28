@@ -95,3 +95,16 @@ div.ui.container.eic-container {
 .menu-reactions {
   background-image: url('./images/reactions.png');
 }
+
+
+/*Hide expander for rows non-buildable components in materials table*/
+.rt-tr[data-qnt="0"] > .rt-expandable {
+        visibility: hidden;
+}
+/*Use cursor icon for entire row for expandable materials table rows*/
+.rt-tr {
+  cursor: pointer !important;
+}
+.rt-tr[data-qnt="0"] {
+  cursor: default !important;
+}
