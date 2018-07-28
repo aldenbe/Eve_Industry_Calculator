@@ -3,20 +3,16 @@ import { Grid, Input } from 'semantic-ui-react';
 import { formatNumbersWithCommas, formatTime } from 'utils/general';
 
 const OutputInformation = (props) => {
-  let totalMaterialCost = props.getTotalMaterialCost();
-  let jobGrossCost = props.getJobGrossCost();
   let runs = props.runs;
   let quantityProduced = props.quantityProduced;
   let productSellPrice = props.productSellPrice;
   let jobInstallTax = props.getJobInstallTax();
-  let totalProfit = ( (runs * quantityProduced * productSellPrice ) - totalMaterialCost) - (jobGrossCost + jobInstallTax);
+  let totalProfit = ( (runs * quantityProduced * productSellPrice ) - props.totalMaterialCost) - (props.jobGrossCost + jobInstallTax);
 
   let rawBuildTime = formatTime(props.rawBuildTime * (1 - (props.timeEfficiency / 100)));
 
-  let totalBuildTime = formatTime((props.rawBuildTime * props.runs) * (1 - (props.timeEfficiency / 100)));
 
-
-  let iskPerHour = totalProfit / (props.runs * (props.rawBuildTime / 3600));
+  let iskPerHour = totalProfit / (props.totalBuildTime / 3600);
 
   const formatOutput = (output, displayTrailingDigits) => {
     if(!isNaN(parseFloat(output)) && isFinite(output)){
@@ -28,6 +24,7 @@ const OutputInformation = (props) => {
     else {
       return output
     }
+
   }
   return (
     <Grid.Column width={4}>
@@ -51,7 +48,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={totalBuildTime}
+              value={formatTime(props.totalBuildTime)}
               style={{width:'100%'}}
             />
           </Grid.Column>
@@ -87,7 +84,7 @@ const OutputInformation = (props) => {
           <Grid.Column>
             <Input
               disabled
-              value={formatOutput(props.getJobGrossCost(), true)}
+              value={formatOutput(props.jobGrossCost, true)}
               style={{width:'100%'}}
             />
           </Grid.Column>

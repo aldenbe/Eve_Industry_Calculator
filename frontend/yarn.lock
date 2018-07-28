@@ -6552,6 +6552,12 @@ react-simple-auth@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/react-simple-auth/-/react-simple-auth-1.0.0.tgz#adc2b6858c2cb0e1638036bc6c6307f1842cfdb4"
 
+react-table@^6.8.6:
+  version "6.8.6"
+  resolved "https://registry.yarnpkg.com/react-table/-/react-table-6.8.6.tgz#a0ad8b4839319052d5befc012603fb161e52ede3"
+  dependencies:
+    classnames "^2.2.5"
+
 react@^16.2.0:
   version "16.2.0"
   resolved "https://registry.yarnpkg.com/react/-/react-16.2.0.tgz#a31bd2dab89bff65d42134fa187f24d054c273ba"

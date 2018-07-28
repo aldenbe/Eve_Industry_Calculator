@@ -19,6 +19,7 @@ $blueprintSelect =
   JOIN invTypes on industryBlueprints.typeID = invTypes.typeID
   WHERE groupID in (" . implode(',', $blueprintGroups) . ")
   ORDER BY REPLACE(typeName, '\'', '')";
+  
 if($result = $conn->query($blueprintSelect)){
   $rows = array();
   while($row = $result->fetch_assoc()){

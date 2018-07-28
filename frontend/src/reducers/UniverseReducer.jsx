@@ -22,7 +22,6 @@ const initialState = Object.assign(universe, initialLocations);
 export const universeReducer = (state = initialState, action) => {
   switch(action.type){
     case UPDATE_STRUCTURES:
-      console.log(action.systemID)
       return {
         ...state,
         [action.regionID]: {

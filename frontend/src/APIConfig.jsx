@@ -5,7 +5,7 @@ const hostname = window && window.location && window.location.hostname;
 
 if(hostname === 'localhost') {
   //modify backendHost to coincide with your own local hosting of the backend for dev environment
-  backendHost = 'http://eic/backend/';
+  backendHost = 'http://localhost/eic/backend/';
   iconHost = 'https://image.eveonline.com/type/';
 
 } else {
